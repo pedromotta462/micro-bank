@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-  pull_request:
+      - develop
+  # PRs são tratadas pelo pr-checks.yml
 
 permissions:
   actions: read
@@ -35,7 +36,13 @@ jobs:
 
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: yarn nx-cloud record -- echo Hello World
-      - run: yarn nx run-many -t lint test build
+      
+      # Run lint, test and build on all projects in parallel
+      - run: yarn nx run-many -t lint test build --parallel=3
+      
+      # Run E2E tests sequentially (to avoid conflicts)
+      - run: yarn nx run-many -t e2e --parallel=1
+      
       # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/ci/features/self-healing-ci
       - run: yarn nx fix-ci
         if: always()
