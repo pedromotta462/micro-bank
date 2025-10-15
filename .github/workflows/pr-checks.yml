@@ -1,0 +1,70 @@
+# Configuração do Workflow de CI para Pull Requests
+name: PR Quality Checks
+
+# Gatilho: Executa quando uma PR é aberta ou atualizada para 'develop' ou 'main'
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout do Código
+      # Baixa o código da PR com histórico completo para o Nx affected funcionar
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Importante: buscar a branch base para comparação
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # 2. Buscar a branch base para comparação do Nx
+      - name: Fetch Base Branch
+        run: git fetch origin ${{ github.event.pull_request.base.ref }}
+
+      # 3. Configurar o ambiente Node.js com cache do Yarn
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      # 4. Instalar Dependências com Yarn
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
+      # 5. Rodar Linter nos projetos afetados
+      # Verifica a qualidade do código apenas no que foi modificado
+      - name: Run Linter on Affected Projects
+        run: yarn nx affected --target=lint --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD
+
+      # 6. Rodar Testes Unitários nos projetos afetados
+      # Executa os testes apenas do código impactado pelas mudanças da PR
+      - name: Run Tests on Affected Projects
+        run: yarn nx affected --target=test --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=3 --coverage
+
+      # 7. Rodar Build nos projetos afetados
+      # Garante que o código compila corretamente
+      - name: Build Affected Projects
+        run: yarn nx affected --target=build --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=3
+
+      # 8. Rodar Testes E2E nos projetos afetados (se houver)
+      # Executa testes de integração end-to-end
+      - name: Run E2E Tests on Affected Projects
+        run: yarn nx affected --target=e2e --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=1
+        continue-on-error: false
+
+      # 9. Nx Cloud: Auto-fix CI issues
+      # Tenta corrigir problemas conhecidos automaticamente
+      - name: Fix CI Issues
+        run: yarn nx fix-ci
+        if: always()
