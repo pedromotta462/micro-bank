@@ -31,39 +31,66 @@ jobs:
       - name: Fetch Base Branch
         run: git fetch origin ${{ github.event.pull_request.base.ref }}
 
-      # 3. Configurar o ambiente Node.js com cache do Yarn
+      # 3. Enable Nx Cloud Self-Healing CI with auto-fixing
+      # This must run before dependencies are installed
+      - name: Start CI Run
+        run: npx nx start-ci-run --auto-apply-fixes="*format*,*lint*" --no-distribution
+
+      # 4. Configurar o ambiente Node.js com cache do Yarn
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
 
-      # 4. Instalar Dependências com Yarn
+      # 5. Instalar Dependências com Yarn
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
-      # 5. Rodar Linter nos projetos afetados
+      # 6. Gerar Prisma Clients
+      # Gera os clientes do Prisma antes do build
+      - name: Generate Prisma Clients
+        run: |
+          yarn nx prisma:generate users-service
+          yarn nx prisma:generate transactions-service
+
+      # 7. Rodar Linter nos projetos afetados
       # Verifica a qualidade do código apenas no que foi modificado
       - name: Run Linter on Affected Projects
         run: yarn nx affected --target=lint --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD
 
-      # 6. Rodar Testes Unitários nos projetos afetados
+      # 8. Rodar Testes Unitários nos projetos afetados
       # Executa os testes apenas do código impactado pelas mudanças da PR
       - name: Run Tests on Affected Projects
         run: yarn nx affected --target=test --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=3 --coverage
 
-      # 7. Rodar Build nos projetos afetados
+      # 9. Rodar Build nos projetos afetados
       # Garante que o código compila corretamente
       - name: Build Affected Projects
         run: yarn nx affected --target=build --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=3
 
-      # 8. Rodar Testes E2E nos projetos afetados (se houver)
-      # Executa testes de integração end-to-end
-      - name: Run E2E Tests on Affected Projects
-        run: yarn nx affected --target=e2e --base=origin/${{ github.event.pull_request.base.ref }} --head=HEAD --parallel=1
+      # 10. Rodar Testes E2E - API Gateway
+      # Executa testes de integração do API Gateway isoladamente
+      - name: Run E2E Tests - API Gateway
+        run: yarn nx e2e api-gateway-e2e
         continue-on-error: false
+        if: ${{ contains(github.event.pull_request.changed_files, 'apps/api-gateway') }}
 
-      # 9. Nx Cloud: Auto-fix CI issues
+      # 11. Rodar Testes E2E - Transactions Service
+      # Executa testes de integração do Transactions Service isoladamente
+      - name: Run E2E Tests - Transactions Service
+        run: yarn nx e2e transactions-service-e2e
+        continue-on-error: false
+        if: ${{ contains(github.event.pull_request.changed_files, 'apps/transactions-service') }}
+
+      # 12. Rodar Testes E2E - Users Service
+      # Executa testes de integração do Users Service isoladamente
+      - name: Run E2E Tests - Users Service
+        run: yarn nx e2e users-service-e2e
+        continue-on-error: false
+        if: ${{ contains(github.event.pull_request.changed_files, 'apps/users-service') }}
+
+      # 13. Nx Cloud: Auto-fix CI issues
       # Tenta corrigir problemas conhecidos automaticamente
       - name: Fix CI Issues
         run: yarn nx fix-ci
