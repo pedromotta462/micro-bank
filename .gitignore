@@ -48,4 +48,5 @@ Thumbs.db
 .env.local
 .env.*.local
 
-
+# Prisma files
+**/generated/prisma/**
