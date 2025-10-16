@@ -20,11 +20,10 @@ jobs:
           filter: tree:0
           fetch-depth: 0
 
-      # This enables task distribution via Nx Cloud
-      # Run this command as early as possible, before dependencies are installed
-      # Learn more at https://nx.dev/ci/reference/nx-cloud-cli#npx-nxcloud-startcirun
-      # Uncomment this line to enable task distribution
-      # - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="build"
+      # Enable Nx Cloud Self-Healing CI with auto-fixing for lint and format tasks
+      # This must run before dependencies are installed
+      - name: Start CI Run
+        run: npx nx start-ci-run --auto-apply-fixes="*format*,*lint*" --no-distribution
 
       # Cache node_modules
       - uses: actions/setup-node@v4
@@ -34,14 +33,27 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
+      # Generate Prisma clients before build
+      - name: Generate Prisma Clients
+        run: |
+          yarn nx prisma:generate users-service
+          yarn nx prisma:generate transactions-service
+
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: yarn nx-cloud record -- echo Hello World
       
       # Run lint, test and build on all projects in parallel
       - run: yarn nx run-many -t lint test build --parallel=3
       
-      # Run E2E tests sequentially (to avoid conflicts)
-      - run: yarn nx run-many -t e2e --parallel=1
+      # Run E2E tests sequentially to avoid port conflicts
+      - name: Run E2E Tests - API Gateway
+        run: yarn nx e2e api-gateway-e2e
+        
+      - name: Run E2E Tests - Transactions Service
+        run: yarn nx e2e transactions-service-e2e
+
+      - name: Run E2E Tests - Users Service
+        run: yarn nx e2e users-service-e2e
       
       # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/ci/features/self-healing-ci
       - run: yarn nx fix-ci

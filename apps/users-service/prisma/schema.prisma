@@ -24,7 +24,6 @@ model User {
   password            String          @db.VarChar(255)
   address             String?         @db.Text
   profilePicture      String?         @db.VarChar(500)
-  banking_details_id  String          @unique @db.Uuid
   
   // Timestamps
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)

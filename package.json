@@ -24,7 +24,12 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "docker:restart": "docker-compose restart"
+    "docker:restart": "docker-compose restart",
+    "prisma:generate": "nx run-many --target=prisma:generate --all",
+    "prisma:migrate": "nx run-many --target=prisma:migrate --all",
+    "prisma:studio": "nx run-many --target=prisma:studio --all",
+    "prisma:push": "nx run-many --target=prisma:push --all",
+    "prisma:seed": "nx run-many --target=prisma:seed --all"
   },
   "private": true,
   "dependencies": {
