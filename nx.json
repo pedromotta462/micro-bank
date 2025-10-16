@@ -38,7 +38,12 @@
       "options": {
         "targetName": "test"
       },
-      "exclude": ["apps/micro-bank-e2e/**/*", "apps/api-gateway-e2e/**/*"]
+      "exclude": [
+        "apps/micro-bank-e2e/**/*",
+        "apps/api-gateway-e2e/**/*",
+        "apps/transactions-service-e2e/**/*",
+        "apps/users-service-e2e/**/*"
+      ]
     }
   ]
 }

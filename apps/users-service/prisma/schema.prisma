@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Model
+// ============================================
+model User {
+  id                  String          @id @default(uuid()) @db.Uuid
+  name                String          @db.VarChar(255)
+  email               String          @unique @db.VarChar(255)
+  password            String          @db.VarChar(255)
+  address             String?         @db.Text
+  profilePicture      String?         @db.VarChar(500)
+  
+  // Timestamps
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  
+  // Relationships
+  bankingDetails BankingDetails?
+
+  @@map("users")
+  @@index([email])
+}
+
+// ============================================
+// Banking Details Model
+// ============================================
+model BankingDetails {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  agency        String   @db.VarChar(10)
+  accountNumber String   @db.VarChar(20)
+  
+  // Timestamps
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  
+  // Relationships
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("banking_details")
+  @@index([userId])
+}
