@@ -147,7 +147,9 @@ export class UsersService {
    * Faz upload da foto de perfil no S3 e atualiza o usuário
    * INVALIDA CACHE
    */
-  async uploadProfilePicture(userId: string, file: any) {
+  async uploadProfilePicture(data: UpdateProfilePictureDto) {
+    const { userId, file } = data;
+
     this.logger.log(`Uploading profile picture for user: ${userId} to S3`);
 
     // Verificar se o usuário existe

@@ -54,15 +54,14 @@ export class UsersController {
    * Faz upload da foto de perfil no S3 e atualiza o usuário
    */
   @MessagePattern({ cmd: 'upload_profile_picture' })
-  async uploadProfilePicture(@Payload() data: any) {
+  async uploadProfilePicture(@Payload() data: UpdateProfilePictureDto) {
     this.logger.log(
       `Received upload_profile_picture message for userId: ${data.userId}`
     );
     
     try {
       const result = await this.usersService.uploadProfilePicture(
-        data.userId,
-        data.file
+        data
       );
       this.logger.log(`Successfully uploaded profile picture for user: ${data.userId}`);
       return result;
