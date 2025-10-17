@@ -30,6 +30,7 @@ export class UsersService {
     }
 
     // Remove sensitive data
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
 
     return userWithoutPassword;
@@ -91,12 +92,14 @@ export class UsersService {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = finalUser;
         return userWithoutPassword;
       }
     }
 
     // Remove sensitive data
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = updatedUser;
     return userWithoutPassword;
   }
