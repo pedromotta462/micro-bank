@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { S3Service } from '../../common/services/s3.service';
+import { RedisService } from '../../common/services/redis.service';
 import {
   GetUserByIdDto,
   UpdateUserDto,
@@ -10,18 +11,39 @@ import {
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+  private readonly CACHE_PREFIX = 'user:';
+  private readonly CACHE_TTL = parseInt(process.env.REDIS_USER_TTL || '3600', 10); // 1 hora
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service
+    private readonly s3Service: S3Service,
+    private readonly redis: RedisService
   ) {}
 
   /**
+   * Gera a chave de cache para um usuário
+   */
+  private getCacheKey(userId: string): string {
+    return `${this.CACHE_PREFIX}${userId}`;
+  }
+
+  /**
    * Busca um usuário por ID incluindo seus dados bancários
+   * COM CACHE
    */
   async getUserById(data: GetUserByIdDto) {
-    this.logger.log(`Getting user by id: ${data.userId}`);
+    const cacheKey = this.getCacheKey(data.userId);
 
+    // 1. Tentar buscar no cache
+    const cachedUser = await this.redis.get(cacheKey);
+    if (cachedUser) {
+      this.logger.log(`✅ Cache HIT for user: ${data.userId}`);
+      return cachedUser;
+    }
+
+    this.logger.log(`❌ Cache MISS for user: ${data.userId} - Fetching from database`);
+
+    // 2. Buscar no banco de dados
     const user = await this.prisma.user.findUnique({
       where: { id: data.userId },
       include: {
@@ -33,15 +55,18 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${data.userId} not found`);
     }
 
-    // Remove sensitive data
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
+    const { password, ...userWithoutPassword } = user;     // Remove sensitive data
+
+    // 3. Armazenar no cache
+    await this.redis.set(cacheKey, userWithoutPassword, this.CACHE_TTL);
 
     return userWithoutPassword;
   }
 
   /**
    * Atualiza dados de um usuário (parcial)
+   * INVALIDA CACHE
    */
   async updateUser(data: UpdateUserDto) {
     this.logger.log(`Updating user: ${data.userId}`);
@@ -98,6 +123,11 @@ export class UsersService {
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = finalUser;
+
+        // Invalidar cache após atualização
+        await this.redis.del(this.getCacheKey(data.userId));
+        this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
+
         return userWithoutPassword;
       }
     }
@@ -105,11 +135,17 @@ export class UsersService {
     // Remove sensitive data
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = updatedUser;
+
+    // Invalidar cache após atualização
+    await this.redis.del(this.getCacheKey(data.userId));
+    this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
+
     return userWithoutPassword;
   }
 
   /**
    * Faz upload da foto de perfil no S3 e atualiza o usuário
+   * INVALIDA CACHE
    */
   async uploadProfilePicture(userId: string, file: any) {
     this.logger.log(`Uploading profile picture for user: ${userId} to S3`);
@@ -142,6 +178,10 @@ export class UsersService {
         profilePicture: s3Url,
       },
     });
+
+    // Invalidar cache após atualização
+    await this.redis.del(this.getCacheKey(userId));
+    this.logger.log(`🗑️  Cache invalidated for user: ${userId}`);
 
     return {
       profilePicture: s3Url,
