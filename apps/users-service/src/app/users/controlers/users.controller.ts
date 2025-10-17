@@ -50,22 +50,25 @@ export class UsersController {
   }
 
   /**
-   * Message Pattern: update_profile_picture
-   * Atualiza a foto de perfil de um usuário
+   * Message Pattern: upload_profile_picture
+   * Faz upload da foto de perfil no S3 e atualiza o usuário
    */
-  @MessagePattern({ cmd: 'update_profile_picture' })
-  async updateProfilePicture(@Payload() data: UpdateProfilePictureDto) {
+  @MessagePattern({ cmd: 'upload_profile_picture' })
+  async uploadProfilePicture(@Payload() data: any) {
     this.logger.log(
-      `Received update_profile_picture message for userId: ${data.userId}`
+      `Received upload_profile_picture message for userId: ${data.userId}`
     );
     
     try {
-      const result = await this.usersService.updateProfilePicture(data);
-      this.logger.log(`Successfully updated profile picture for user: ${data.userId}`);
+      const result = await this.usersService.uploadProfilePicture(
+        data.userId,
+        data.file
+      );
+      this.logger.log(`Successfully uploaded profile picture for user: ${data.userId}`);
       return result;
     } catch (error) {
       this.logger.error(
-        `Error updating profile picture for user ${data.userId}:`,
+        `Error uploading profile picture for user ${data.userId}:`,
         error
       );
       throw error;

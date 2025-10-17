@@ -7,18 +7,19 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from '../services/users.service';
 import {
   UpdateUserDto,
   UpdateUserSchema,
-  UpdateProfilePictureDto,
-  UpdateProfilePictureSchema,
   UserResponseDto,
   GetUserByIdParams,
   GetUserByIdSchema,
 } from '../dto';
-import { ZodValidationPipe } from '../../common/pipes';
+import { ZodValidationPipe, FileValidationPipe } from '../../common/pipes';
 
 @Controller('/users')
 export class UsersController {
@@ -82,34 +83,36 @@ export class UsersController {
 
   /**
    * PATCH /api/users/:userId/profile-picture
-   * Atualização da foto de perfil
+   * Upload e atualização da foto de perfil
+   * Content-Type: multipart/form-data
+   * Campo: file (jpg, jpeg, png, webp, máx 5MB)
    */
   @Patch(':userId/profile-picture')
+  @UseInterceptors(FileInterceptor('file'))
   async updateProfilePicture(
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
-    @Body(new ZodValidationPipe(UpdateProfilePictureSchema))
-    updateProfilePictureDto: UpdateProfilePictureDto
+    @UploadedFile(new FileValidationPipe()) file: any
   ): Promise<{ message: string; profilePicture: string }> {
     this.logger.log(
-      `Updating profile picture for user ${params.userId}`
+      `Uploading profile picture for user ${params.userId}, file: ${file.originalname}`
     );
 
     try {
-      const result = await this.usersService.updateProfilePicture(
+      const result = await this.usersService.uploadProfilePicture(
         params.userId,
-        updateProfilePictureDto.profilePicture
+        file
       );
       return {
-        message: 'Profile picture updated successfully',
+        message: 'Profile picture uploaded successfully',
         profilePicture: result.profilePicture,
       };
     } catch (error) {
       this.logger.error(
-        `Error updating profile picture for user ${params.userId}: ${error.message}`,
+        `Error uploading profile picture for user ${params.userId}: ${error.message}`,
         error.stack
       );
       throw new HttpException(
-        error.message || 'Failed to update profile picture',
+        error.message || 'Failed to upload profile picture',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma.service';
+import { PrismaService } from '../../common/services/prisma.service';
+import { S3Service } from '../../common/services/s3.service';
 import {
   GetUserByIdDto,
   UpdateUserDto,
@@ -10,7 +11,10 @@ import {
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service
+  ) {}
 
   /**
    * Busca um usuário por ID incluindo seus dados bancários
@@ -105,30 +109,42 @@ export class UsersService {
   }
 
   /**
-   * Atualiza a foto de perfil do usuário
+   * Faz upload da foto de perfil no S3 e atualiza o usuário
    */
-  async updateProfilePicture(data: UpdateProfilePictureDto) {
-    this.logger.log(`Updating profile picture for user: ${data.userId}`);
+  async uploadProfilePicture(userId: string, file: any) {
+    this.logger.log(`Uploading profile picture for user: ${userId} to S3`);
 
     // Verificar se o usuário existe
     const existingUser = await this.prisma.user.findUnique({
-      where: { id: data.userId },
+      where: { id: userId },
     });
 
     if (!existingUser) {
-      throw new NotFoundException(`User with ID ${data.userId} not found`);
+      throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    // Atualizar foto de perfil
+    // Reconstituir o arquivo do buffer
+    const fileBuffer = Buffer.from(file.buffer.data);
+    const fileObject = {
+      buffer: fileBuffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    } as any;
+
+    // Fazer upload no S3
+    const s3Url = await this.s3Service.uploadFile(fileObject, userId);
+
+    // Atualizar foto de perfil no banco
     await this.prisma.user.update({
-      where: { id: data.userId },
+      where: { id: userId },
       data: {
-        profilePicture: data.profilePicture,
+        profilePicture: s3Url,
       },
     });
 
     return {
-      profilePicture: data.profilePicture,
+      profilePicture: s3Url,
     };
   }
 }

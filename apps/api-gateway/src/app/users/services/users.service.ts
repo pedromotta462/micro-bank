@@ -63,28 +63,40 @@ export class UsersService {
   }
 
   /**
-   * Atualiza a foto de perfil de um usuário
+   * Faz upload da foto de perfil de um usuário
+   * Envia o arquivo para o microserviço que fará o upload no S3
    */
-  async updateProfilePicture(
+  async uploadProfilePicture(
     userId: string,
-    profilePicture: string
+    file: any
   ): Promise<{ profilePicture: string }> {
     this.logger.log(
-      `Sending update_profile_picture message for userId: ${userId}`
+      `Sending upload_profile_picture message for userId: ${userId}`
     );
 
     try {
       const response = await firstValueFrom(
         this.usersClient
-          .send({ cmd: 'update_profile_picture' }, { userId, profilePicture })
-          .pipe(timeout(5000))
+          .send(
+            { cmd: 'upload_profile_picture' },
+            {
+              userId,
+              file: {
+                buffer: file.buffer,
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                size: file.size,
+              },
+            }
+          )
+          .pipe(timeout(10000)) // 10s para upload
       );
 
-      this.logger.log(`Profile picture updated for user ${userId}`);
+      this.logger.log(`Profile picture uploaded for user ${userId}`);
       return response;
     } catch (error) {
       this.logger.error(
-        `Error communicating with users-service for update profile picture userId ${userId}:`,
+        `Error communicating with users-service for upload profile picture userId ${userId}:`,
         error
       );
       throw error;
