@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { UsersController } from '../controlers/users.controller';
+import { UsersController } from '../controllers/users.controller';
 import { UsersService } from '../services/users.service';
 import { PrismaService } from '../../common/services/prisma.service';
 import { S3Service, RedisService } from '../../common/services';
