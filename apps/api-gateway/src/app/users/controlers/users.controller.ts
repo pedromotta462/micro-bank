@@ -7,7 +7,6 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  UsePipes,
 } from '@nestjs/common';
 import { UsersService } from '../services/users.service';
 import {

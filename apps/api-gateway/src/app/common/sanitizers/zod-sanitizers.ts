@@ -17,6 +17,7 @@ export const sanitizeHtml = (value: string): string => {
  */
 export const sanitizeText = (value: string): string => {
   return value
+    // eslint-disable-next-line no-useless-escape
     .replace(/[<>\"'`]/g, '') // Remove caracteres perigosos
     .trim();
 };
