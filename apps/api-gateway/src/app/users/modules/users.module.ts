@@ -7,7 +7,7 @@ import { UsersService } from '../services/users.service';
   imports: [
     ClientsModule.register([
       {
-        name: 'USERS_SERVICE',
+        name: 'USERS_SERVICE_CLIENT',
         transport: Transport.RMQ,
         options: {
           urls: [process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672'],

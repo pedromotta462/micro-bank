@@ -8,7 +8,7 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
   constructor(
-    @Inject('USERS_SERVICE') private readonly usersClient: ClientProxy
+    @Inject('USERS_SERVICE_CLIENT') private readonly usersClient: ClientProxy
   ) {}
 
   /**

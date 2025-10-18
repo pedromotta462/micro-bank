@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../../common/services/prisma.service';
 import { S3Service } from '../../common/services/s3.service';
 import { RedisService } from '../../common/services/redis.service';
@@ -17,7 +18,10 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    @Inject('TRANSACTIONS_SERVICE_CLIENT') private readonly transactionsClient: ClientProxy,
+    @Inject('NOTIFICATIONS_SERVICE_CLIENT') private readonly notificationsClient: ClientProxy
   ) {}
 
   /**
@@ -127,6 +131,16 @@ export class UsersService {
         // Invalidar cache após atualização
         await this.redis.del(this.getCacheKey(data.userId));
         this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
+
+        // Publicar evento de notificação
+        this.notificationsClient.emit(
+          'notifications.user.updated',
+          {
+            userId: data.userId,
+            timestamp: new Date().toISOString(),
+          }
+        );
+        this.logger.log(`📨 Notification event emitted for user update: ${data.userId}`);
 
         return userWithoutPassword;
       }
