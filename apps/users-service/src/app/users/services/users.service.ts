@@ -155,6 +155,16 @@ export class UsersService {
     await this.redis.del(this.getCacheKey(data.userId));
     this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
 
+    // Publicar evento de notificação
+    this.notificationsClient.emit(
+      'notifications.user.updated',
+      {
+        userId: data.userId,
+        timestamp: new Date().toISOString(),
+      }
+    );
+    this.logger.log(`📨 Notification event emitted for user update: ${data.userId}`);
+
     return userWithoutPassword;
   }
 
