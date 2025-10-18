@@ -13,3 +13,118 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ============================================
+// Transaction Model
+// ============================================
+model Transaction {
+  id             String            @id @default(uuid()) @db.Uuid
+  
+  // Participants
+  senderUserId   String            @db.Uuid
+  receiverUserId String            @db.Uuid
+  
+  // Amount & Fees
+  amount         Decimal           @db.Decimal(15, 2) // Até 9.999.999.999.999,99
+  fee            Decimal           @default(0.00) @db.Decimal(10, 2) // Taxa da transação
+  totalAmount    Decimal           @db.Decimal(15, 2) // amount + fee (computed)
+  
+  // Description & Reference
+  description    String            @db.VarChar(500)
+  externalId     String?           @unique @db.VarChar(100) // ID externo (integração)
+  
+  // Transaction Details
+  type           TransactionType   @default(TRANSFER)
+  status         TransactionStatus @default(PENDING)
+  
+  // Failure Tracking
+  failureReason  String?           @db.Text
+  retryCount     Int               @default(0)
+  
+  // Security & Audit
+  ipAddress      String?           @db.VarChar(45) // IPv4 ou IPv6
+  userAgent      String?           @db.Text
+  
+  // Timestamps
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+  completedAt    DateTime?         @db.Timestamptz(3)
+  cancelledAt    DateTime?         @db.Timestamptz(3)
+
+  @@map("transactions")
+  
+  // Índices para performance
+  @@index([senderUserId])
+  @@index([receiverUserId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt(sort: Desc)]) // Para listagem ordenada
+  @@index([senderUserId, status])
+  @@index([receiverUserId, status])
+}
+
+// ============================================
+// Transaction Event Log (Auditoria)
+// ============================================
+model TransactionEvent {
+  id            String              @id @default(uuid()) @db.Uuid
+  transactionId String              @db.Uuid
+  
+  // Event Details
+  eventType     TransactionEventType
+  oldStatus     TransactionStatus?
+  newStatus     TransactionStatus?
+  
+  // Context
+  description   String?             @db.Text
+  performedBy   String?             @db.Uuid // userId que executou ação (se aplicável)
+  
+  // Timestamp
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+
+  @@map("transaction_events")
+  @@index([transactionId])
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum TransactionType {
+  TRANSFER    // Transferência entre contas MicroBank
+  PIX         // Transferência via PIX
+  TED         // Transferência TED
+  DOC         // Transferência DOC
+  PAYMENT     // Pagamento de boleto/serviço
+  DEPOSIT     // Depósito
+  WITHDRAWAL  // Saque
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  PENDING      // Aguardando processamento
+  PROCESSING   // Sendo processada (validação de saldo, etc)
+  COMPLETED    // Concluída com sucesso
+  FAILED       // Falhou (saldo insuficiente, conta bloqueada, etc)
+  CANCELLED    // Cancelada pelo usuário ou sistema
+  REVERSED     // Estornada (rollback)
+
+  @@map("transaction_status")
+}
+
+enum TransactionEventType {
+  CREATED           // Transação criada
+  PROCESSING_STARTED // Iniciou processamento
+  BALANCE_VALIDATED  // Saldo validado
+  BALANCE_UPDATED    // Saldo atualizado
+  COMPLETED          // Concluída
+  FAILED             // Falhou
+  CANCELLED          // Cancelada
+  REVERSED           // Estornada
+  RETRY_ATTEMPTED    // Tentativa de retry
+
+  @@map("transaction_event_type")
+}
