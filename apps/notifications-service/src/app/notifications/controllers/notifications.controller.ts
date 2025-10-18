@@ -1,5 +1,6 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { NotificationsService } from '../services/notifications.service';
 import {
   TransactionNotificationSchema,
@@ -12,9 +13,11 @@ import {
  */
 @Controller()
 export class NotificationsController {
-  private readonly logger = new Logger(NotificationsController.name);
-
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    @InjectPinoLogger(NotificationsController.name)
+    private readonly logger: PinoLogger,
+    private readonly notificationsService: NotificationsService
+  ) {}
 
   /**
    * EventPattern: transaction_notification
@@ -28,7 +31,7 @@ export class NotificationsController {
       // Validação com Zod
       const data = TransactionNotificationSchema.parse(rawData);
       
-      this.logger.log(
+      this.logger.info(
         `📥 Received transaction_notification event: ${data.transactionId}`
       );
 
@@ -54,7 +57,7 @@ export class NotificationsController {
       // Validação com Zod
       const data = BalanceUpdatedNotificationSchema.parse(rawData);
       
-      this.logger.log(
+      this.logger.info(
         `📥 Received balance updated event: User ${data.userId} - ${data.type}`
       );
 
@@ -80,7 +83,7 @@ export class NotificationsController {
       // Validação com Zod
       const data = UserUpdatedNotificationSchema.parse(rawData);
       
-      this.logger.log(`📥 Received user updated event: User ${data.userId}`);
+      this.logger.info(`📥 Received user updated event: User ${data.userId}`);
 
       await this.notificationsService.handleUserUpdatedNotification(data);
     } catch (error) {

@@ -6,11 +6,11 @@ import {
   Param,
   HttpException,
   HttpStatus,
-  Logger,
   UseInterceptors,
   UploadedFile,
   UseGuards,
 } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from '../services/users.service';
 import {
@@ -31,9 +31,11 @@ import { CurrentUser, CurrentUserData } from '../../auth/decorators';
 @Controller('/users')
 @UseGuards(JwtAuthGuard, OwnershipGuard)
 export class UsersController {
-  private readonly logger = new Logger(UsersController.name);
-
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    @InjectPinoLogger(UsersController.name)
+    private readonly logger: PinoLogger,
+    private readonly usersService: UsersService
+  ) {}
 
   /**
    * GET /api/users/:userId
@@ -45,7 +47,7 @@ export class UsersController {
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
     @CurrentUser() user: CurrentUserData
   ): Promise<UserResponseDto> {
-    this.logger.log(`Getting user details for userId: ${params.userId}, authenticated user: ${user.userId}`);
+    this.logger.info(`Getting user details for userId: ${params.userId}, authenticated user: ${user.userId}`);
 
     try {
       const userDetails = await this.usersService.getUserById(params.userId);
@@ -67,7 +69,7 @@ export class UsersController {
     @Param('email') email: string,
     @CurrentUser() user: CurrentUserData
   ): Promise<UserResponseDto> {
-    this.logger.log(`Getting user details for email: ${email}, authenticated user: ${user.userId}`);
+    this.logger.info(`Getting user details for email: ${email}, authenticated user: ${user.userId}`);
 
     try {
       const userDetails = await this.usersService.getUserByEmail(email);
@@ -95,7 +97,7 @@ export class UsersController {
     @Body(new ZodValidationPipe(UpdateUserSchema)) updateUserDto: UpdateUserDto,
     @CurrentUser() user: CurrentUserData
   ): Promise<{ message: string; user: UserResponseDto }> {
-    this.logger.log(`Updating user ${params.userId} with data, authenticated user: ${user.userId}`, updateUserDto);
+    this.logger.info(`Updating user ${params.userId} with data, authenticated user: ${user.userId}`, updateUserDto);
 
     try {
       const updatedUser = await this.usersService.updateUser(params.userId, updateUserDto);
@@ -129,7 +131,7 @@ export class UsersController {
     @UploadedFile(new FileValidationPipe()) file: any,
     @CurrentUser() user: CurrentUserData
   ): Promise<{ message: string; profilePicture: string }> {
-    this.logger.log(
+    this.logger.info(
       `Uploading profile picture for user ${params.userId}, file: ${file.originalname}, authenticated user: ${user.userId}`
     );
 
@@ -164,7 +166,7 @@ export class UsersController {
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
     @CurrentUser() user: CurrentUserData
   ): Promise<{ balance: number }> {
-    this.logger.log(`Getting transaction balance for userId: ${params.userId}, authenticated user: ${user.userId}`);
+    this.logger.info(`Getting transaction balance for userId: ${params.userId}, authenticated user: ${user.userId}`);
 
     try {
       const balance = await this.usersService.getUserTransactionBalance(params.userId);

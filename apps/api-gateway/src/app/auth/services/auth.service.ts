@@ -1,12 +1,12 @@
 import {
   Injectable,
-  Logger,
   UnauthorizedException,
   ConflictException,
   Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { firstValueFrom } from 'rxjs';
 import * as argon2 from 'argon2';
 import { LoginDto, RegisterDto } from '../dto';
@@ -29,13 +29,13 @@ export interface AuthResponse {
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
+    @InjectPinoLogger(AuthService.name)
+    private readonly logger: PinoLogger,
     private readonly jwtService: JwtService,
     @Inject('USERS_SERVICE') private readonly usersClient: ClientProxy
   ) {
-    this.logger.log('AuthService initialized');
+    this.logger.info('AuthService initialized');
   }
 
   /**
@@ -64,7 +64,7 @@ export class AuthService {
       const { password: _, ...result } = user;
       return result;
     } catch (error: any) {
-      this.logger.error(`Error validating user: ${error.message}`, error.stack);
+      this.logger.error({ err: error }, `Error validating user: ${error.message}`);
       return null;
     }
   }
@@ -86,7 +86,7 @@ export class AuthService {
 
     const access_token = this.jwtService.sign(payload);
 
-    this.logger.log(`User ${user.email} logged in successfully`);
+    this.logger.info({ userId: user.id, email: user.email }, `User logged in successfully`);
 
     return {
       access_token,
@@ -117,7 +117,7 @@ export class AuthService {
         )
       );
 
-      this.logger.log(`User ${user.email} registered successfully`);
+      this.logger.info({ userId: user.id, email: user.email }, `User registered successfully`);
 
       // Faz o login automático após o registro
       const payload: JwtPayload = {
@@ -136,7 +136,7 @@ export class AuthService {
         },
       };
     } catch (error) {
-      this.logger.error(`Error registering user: ${error.message}`, error.stack);
+      this.logger.error({ err: error }, `Error registering user: ${error.message}`);
 
       // Se for erro de email duplicado
       if (error.message?.includes('email') || error.message?.includes('unique')) {

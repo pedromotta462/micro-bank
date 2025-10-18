@@ -8,9 +8,9 @@ import {
   Req,
   HttpStatus,
   HttpCode,
-  Logger,
   UseGuards,
 } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { Request } from 'express';
 import { TransactionsService } from '../services/transactions.service';
 import {
@@ -37,9 +37,11 @@ import { OwnershipGuard, TransactionOwnershipGuard } from '../../auth/guards';
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
 export class TransactionsController {
-  private readonly logger = new Logger(TransactionsController.name);
-
-  constructor(private readonly transactionsService: TransactionsService) {}
+  constructor(
+    @InjectPinoLogger(TransactionsController.name)
+    private readonly logger: PinoLogger,
+    private readonly transactionsService: TransactionsService
+  ) {}
 
   /**
    * POST /api/transactions
@@ -53,7 +55,7 @@ export class TransactionsController {
     @CurrentUser() user: CurrentUserData,
     @Req() req: Request
   ): Promise<TransactionResponseDto> {
-    this.logger.log(`POST /api/transactions - Creating new transaction for user: ${user.userId}`);
+    this.logger.info(`POST /api/transactions - Creating new transaction for user: ${user.userId}`);
 
     // Extrai informações de contexto da requisição
     const ipAddress = req.ip || req.socket.remoteAddress;
@@ -80,7 +82,7 @@ export class TransactionsController {
     @Param(new ZodValidationPipe(getTransactionByIdParamsSchema)) params: GetTransactionByIdParams,
     @CurrentUser() user: CurrentUserData
   ): Promise<TransactionResponseDto> {
-    this.logger.log(
+    this.logger.info(
       `GET /api/transactions/${params.transactionId} - Getting transaction details for user: ${user.userId}`
     );
 
@@ -100,7 +102,7 @@ export class TransactionsController {
     @Query(new ZodValidationPipe(getTransactionsQuerySchema)) queryParams: GetTransactionsQueryDto,
     @CurrentUser() user: CurrentUserData
   ): Promise<TransactionsListResponseDto> {
-    this.logger.log(
+    this.logger.info(
       `GET /api/transactions/user/${params.userId} - Listing user transactions for authenticated user: ${user.userId}`
     );
 

@@ -1,13 +1,16 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
-  private readonly logger = new Logger(RedisService.name);
   private readonly client: Redis;
   private readonly isEnabled: boolean;
 
-  constructor() {
+  constructor(
+    @InjectPinoLogger(RedisService.name)
+    private readonly logger: PinoLogger
+  ) {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     this.isEnabled = process.env.REDIS_ENABLED !== 'false';
 
@@ -34,7 +37,7 @@ export class RedisService implements OnModuleDestroy {
       });
 
       this.client.on('connect', () => {
-        this.logger.log('✅ Redis connected successfully');
+        this.logger.info('✅ Redis connected successfully');
       });
 
       this.client.on('error', (err) => {
@@ -45,7 +48,7 @@ export class RedisService implements OnModuleDestroy {
         this.logger.warn('Redis connection closed');
       });
 
-      this.logger.log(`Redis client initialized: ${redisUrl}`);
+      this.logger.info(`Redis client initialized: ${redisUrl}`);
     } catch (error) {
       this.logger.error(`Failed to initialize Redis: ${error.message}`);
       this.isEnabled = false;
@@ -152,7 +155,7 @@ export class RedisService implements OnModuleDestroy {
 
     try {
       await this.client.flushall();
-      this.logger.log('🗑️  Cache flushed (all keys deleted)');
+      this.logger.info('🗑️  Cache flushed (all keys deleted)');
     } catch (error) {
       this.logger.error(`Error flushing cache: ${error.message}`);
     }
@@ -164,7 +167,7 @@ export class RedisService implements OnModuleDestroy {
   async onModuleDestroy() {
     if (this.client) {
       await this.client.quit();
-      this.logger.log('Redis connection closed');
+      this.logger.info('Redis connection closed');
     }
   }
 }

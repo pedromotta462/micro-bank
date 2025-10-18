@@ -1,4 +1,5 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
@@ -10,9 +11,9 @@ import {
 
 @Injectable()
 export class TransactionsService {
-  private readonly logger = new Logger(TransactionsService.name);
-
   constructor(
+    @InjectPinoLogger(TransactionsService.name)
+    private readonly logger: PinoLogger,
     @Inject('TRANSACTIONS_SERVICE_CLIENT')
     private readonly transactionsClient: ClientProxy
   ) {}
@@ -26,7 +27,7 @@ export class TransactionsService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<TransactionResponseDto> {
-    this.logger.log(`Sending create_transaction message for userId: ${userId}`);
+    this.logger.info(`Sending create_transaction message for userId: ${userId}`);
 
     try {
       const response = await firstValueFrom(
@@ -43,7 +44,7 @@ export class TransactionsService {
           .pipe(timeout(10000)) // 10s para criar transação
       );
 
-      this.logger.log(
+      this.logger.info(
         `Transaction created successfully: ${response.id} for user ${userId}`
       );
       
@@ -63,7 +64,7 @@ export class TransactionsService {
   async getTransactionById(
     transactionId: string
   ): Promise<TransactionResponseDto> {
-    this.logger.log(
+    this.logger.info(
       `Sending get_transaction_by_id message for transactionId: ${transactionId}`
     );
 
@@ -74,7 +75,7 @@ export class TransactionsService {
           .pipe(timeout(5000))
       );
 
-      this.logger.log(
+      this.logger.info(
         `Received transaction data for transactionId: ${transactionId}`
       );
       return response;
@@ -94,7 +95,7 @@ export class TransactionsService {
     userId: string,
     query: GetTransactionsQueryDto
   ): Promise<TransactionsListResponseDto> {
-    this.logger.log(
+    this.logger.info(
       `Sending get_transactions_by_user message for userId: ${userId}`
     );
 
@@ -111,7 +112,7 @@ export class TransactionsService {
           .pipe(timeout(10000))
       );
 
-      this.logger.log(
+      this.logger.info(
         `Received ${response.transactions?.length || 0} transactions for userId: ${userId}`
       );
       return response;

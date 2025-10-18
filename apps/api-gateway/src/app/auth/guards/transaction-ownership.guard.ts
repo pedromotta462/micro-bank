@@ -4,8 +4,8 @@ import {
   ExecutionContext,
   ForbiddenException,
   Inject,
-  Logger,
 } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 
@@ -15,9 +15,9 @@ import { firstValueFrom, timeout } from 'rxjs';
  */
 @Injectable()
 export class TransactionOwnershipGuard implements CanActivate {
-  private readonly logger = new Logger(TransactionOwnershipGuard.name);
-
   constructor(
+    @InjectPinoLogger(TransactionOwnershipGuard.name)
+    private readonly logger: PinoLogger,
     @Inject('TRANSACTIONS_SERVICE_CLIENT')
     private readonly transactionsClient: ClientProxy
   ) {}
@@ -27,19 +27,19 @@ export class TransactionOwnershipGuard implements CanActivate {
     const user = request.user; // Do JwtStrategy: { userId, email }
     const transactionId = request.params.transactionId;
 
-    this.logger.log(
+    this.logger.info(
       `Checking transaction ownership: transactionId=${transactionId}, userId=${user.userId}`
     );
 
     if (!transactionId) {
       // Se não tem transactionId, permite (não é um recurso de transação específica)
-      this.logger.log('No transactionId, allowing access');
+      this.logger.info('No transactionId, allowing access');
       return true;
     }
 
     try {
       // Busca a transação para verificar ownership
-      this.logger.log(`Fetching transaction ${transactionId} from service`);
+      this.logger.info(`Fetching transaction ${transactionId} from service`);
       
       const transaction = await firstValueFrom(
         this.transactionsClient
@@ -47,7 +47,7 @@ export class TransactionOwnershipGuard implements CanActivate {
           .pipe(timeout(5000))
       );
 
-      this.logger.log(
+      this.logger.info(
         `Transaction found: fromUserId=${transaction.senderUserId}, toUserId=${transaction.receiverUserId}`
       );
 
@@ -56,7 +56,7 @@ export class TransactionOwnershipGuard implements CanActivate {
         transaction.senderUserId === user.userId ||
         transaction.receiverUserId === user.userId;
 
-      this.logger.log(
+      this.logger.info(
         `Ownership check result: isOwner=${isOwner} (user=${user.userId})`
       );
 
@@ -69,7 +69,7 @@ export class TransactionOwnershipGuard implements CanActivate {
         );
       }
 
-      this.logger.log(`Access granted for user ${user.userId}`);
+      this.logger.info(`Access granted for user ${user.userId}`);
       return true;
     } catch (error) {
       this.logger.error(

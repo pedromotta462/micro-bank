@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Logger, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { AuthService } from '../services/auth.service';
 import { LoginDto, LoginSchema, RegisterDto, RegisterSchema } from '../dto';
 import { ZodValidationPipe } from '../../common/pipes';
@@ -7,9 +8,11 @@ import { CurrentUser, CurrentUserData } from '../decorators';
 
 @Controller('/auth')
 export class AuthController {
-  private readonly logger = new Logger(AuthController.name);
-
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    @InjectPinoLogger(AuthController.name)
+    private readonly logger: PinoLogger,
+    private readonly authService: AuthService
+  ) {}
 
   /**
    * POST /api/auth/login
@@ -19,7 +22,7 @@ export class AuthController {
   async login(
     @Body(new ZodValidationPipe(LoginSchema)) loginDto: LoginDto
   ) {
-    this.logger.log(`Login attempt for email: ${loginDto.email}`);
+    this.logger.info(`Login attempt for email: ${loginDto.email}`);
     return this.authService.login(loginDto);
   }
 
@@ -31,7 +34,7 @@ export class AuthController {
   async register(
     @Body(new ZodValidationPipe(RegisterSchema)) registerDto: RegisterDto
   ) {
-    this.logger.log(`Registration attempt for email: ${registerDto.email}`);
+    this.logger.info(`Registration attempt for email: ${registerDto.email}`);
     return this.authService.register(registerDto);
   }
 
@@ -42,7 +45,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@CurrentUser() user: CurrentUserData) {
-    this.logger.log(`Profile request for user: ${user.userId}`);
+    this.logger.info(`Profile request for user: ${user.userId}`);
     return {
       userId: user.userId,
       email: user.email,

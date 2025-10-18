@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import {
   TransactionNotificationDto,
   BalanceUpdatedNotificationDto,
@@ -12,14 +13,17 @@ import {
  */
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
+  constructor(
+    @InjectPinoLogger(NotificationsService.name)
+    private readonly logger: PinoLogger
+  ) {}
 
   /**
    * Processa notificação de transação
    * Futuramente: enviar email, SMS, push notification
    */
   async handleTransactionNotification(data: TransactionNotificationDto) {
-    this.logger.log(
+    this.logger.info(
       `📨 Transaction Notification Received: ${data.eventType} - Transaction ${data.transactionId}`
     );
 
@@ -53,7 +57,7 @@ export class NotificationsService {
         `Você recebeu R$ ${data.amount.toFixed(2)}`
       );
 
-      this.logger.log(
+      this.logger.info(
         `✅ Transaction notification processed for transaction ${data.transactionId}`
       );
     } catch (error) {
@@ -68,7 +72,7 @@ export class NotificationsService {
    * Processa notificação de atualização de saldo
    */
   async handleBalanceUpdatedNotification(data: BalanceUpdatedNotificationDto) {
-    this.logger.log(
+    this.logger.info(
       `💰 Balance Updated Notification: User ${data.userId} - ${data.type}`
     );
 
@@ -91,7 +95,7 @@ export class NotificationsService {
 
       await this.sendNotificationToUser(data.userId, message);
 
-      this.logger.log(
+      this.logger.info(
         `✅ Balance notification processed for user ${data.userId}`
       );
     } catch (error) {
@@ -106,7 +110,7 @@ export class NotificationsService {
    * Processa notificação de atualização de usuário
    */
   async handleUserUpdatedNotification(data: UserUpdatedNotificationDto) {
-    this.logger.log(`👤 User Updated Notification: User ${data.userId}`);
+    this.logger.info(`👤 User Updated Notification: User ${data.userId}`);
 
     try {
       // Log detalhado da notificação
@@ -121,7 +125,7 @@ export class NotificationsService {
         'Seus dados foram atualizados com sucesso'
       );
 
-      this.logger.log(`✅ User notification processed for user ${data.userId}`);
+      this.logger.info(`✅ User notification processed for user ${data.userId}`);
     } catch (error) {
       this.logger.error(
         `❌ Error processing user notification: ${error.message}`,
@@ -140,7 +144,7 @@ export class NotificationsService {
     // Simular delay de envio
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    this.logger.log(`📤 Notification sent to user ${userId}: ${message}`);
+    this.logger.info(`📤 Notification sent to user ${userId}: ${message}`);
 
     // TODO: Implementar integrações reais:
     // - SendGrid/AWS SES para email
