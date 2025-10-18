@@ -33,7 +33,7 @@ async function bootstrap() {
   await app.startAllMicroservices();
   logger.log('🎯 Microservice is listening on transactions_queue');
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.PORT || 3001;
   await app.listen(port);
   logger.log(
     `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`
