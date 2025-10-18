@@ -454,6 +454,7 @@ export class UsersService {
     });
 
     // Remove a senha antes de retornar
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
 
     // Emitir evento de novo usuário para notifications

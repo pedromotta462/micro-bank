@@ -10,7 +10,6 @@ import {
   HttpCode,
   Logger,
   UseGuards,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { TransactionsService } from '../services/transactions.service';
