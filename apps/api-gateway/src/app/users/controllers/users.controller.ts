@@ -117,4 +117,29 @@ export class UsersController {
       );
     }
   }
+
+  /**
+   * GET /api/users/:userId/transaction-balance
+   * Get user transaction balance
+   */
+  @Get(':userId/transaction-balance')
+  async getUserTransactionBalance(
+    @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams
+  ): Promise<{ balance: number }> {
+    this.logger.log(`Getting transaction balance for userId: ${params.userId}`);
+
+    try {
+      const balance = await this.usersService.getUserTransactionBalance(params.userId);
+      return balance;
+    } catch (error) {
+      this.logger.error(
+        `Error getting transaction balance for user ${params.userId}: ${error.message}`,
+        error.stack
+      );
+      throw new HttpException(
+        error.message || 'Failed to get transaction balance',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
 }

@@ -7,6 +7,7 @@ import {
   GetUserByIdDto,
   UpdateUserDto,
   UpdateProfilePictureDto,
+  ProcessTransactionBalanceDto,
 } from '../dto';
 
 @Injectable()
@@ -154,6 +155,16 @@ export class UsersService {
     await this.redis.del(this.getCacheKey(data.userId));
     this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
 
+    // Publicar evento de notificação
+    this.notificationsClient.emit(
+      'notifications.user.updated',
+      {
+        userId: data.userId,
+        timestamp: new Date().toISOString(),
+      }
+    );
+    this.logger.log(`📨 Notification event emitted for user update: ${data.userId}`);
+
     return userWithoutPassword;
   }
 
@@ -202,5 +213,192 @@ export class UsersService {
     return {
       profilePicture: s3Url,
     };
+  }
+
+  /**
+   * Processa transação de saldo (débito do sender e crédito do receiver)
+   * IDEMPOTENTE - Usa transactionId para evitar processamento duplicado
+   * TRANSACIONAL - Usa transaction do Prisma para garantir atomicidade
+   */
+  async processTransactionBalance(data: ProcessTransactionBalanceDto & { transactionId?: string }) {
+    const { senderId, receiverId, totalAmount, netAmount, transactionId } = data;
+
+    this.logger.log(
+      `Processing transaction balance: ${senderId} -> ${receiverId} (Total: ${totalAmount}, Net: ${netAmount})`
+    );
+
+    // Idempotência: verificar se a transação já foi processada
+    if (transactionId) {
+      const existingHistory = await this.prisma.balanceHistory.findFirst({
+        where: { transactionId },
+      });
+
+      if (existingHistory) {
+        this.logger.warn(`Transaction ${transactionId} already processed - skipping`);
+        return {
+          success: true,
+          message: 'Transaction already processed',
+          alreadyProcessed: true,
+        };
+      }
+    }
+
+    try {
+      // Usar transação do Prisma para garantir atomicidade
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Buscar dados bancários do sender
+        const senderBanking = await tx.bankingDetails.findUnique({
+          where: { userId: senderId },
+        });
+
+        if (!senderBanking) {
+          throw new NotFoundException(`Banking details not found for sender ${senderId}`);
+        }
+
+        // 2. Validar saldo suficiente
+        const senderBalance = Number(senderBanking.balance);
+        if (senderBalance < totalAmount) {
+          this.logger.warn(
+            `Insufficient balance for sender ${senderId}: ${senderBalance} < ${totalAmount}`
+          );
+          return {
+            success: false,
+            message: 'Insufficient balance',
+            currentBalance: senderBalance,
+            requiredAmount: totalAmount,
+          };
+        }
+
+        // 3. Buscar dados bancários do receiver
+        const receiverBanking = await tx.bankingDetails.findUnique({
+          where: { userId: receiverId },
+        });
+
+        if (!receiverBanking) {
+          throw new NotFoundException(`Banking details not found for receiver ${receiverId}`);
+        }
+
+        const receiverBalance = Number(receiverBanking.balance);
+
+        // 4. Debitar do sender (valor total com taxa)
+        const newSenderBalance = senderBalance - totalAmount;
+        await tx.bankingDetails.update({
+          where: { userId: senderId },
+          data: { balance: newSenderBalance },
+        });
+
+        // 5. Creditar ao receiver (valor líquido sem taxa)
+        const newReceiverBalance = receiverBalance + netAmount;
+        await tx.bankingDetails.update({
+          where: { userId: receiverId },
+          data: { balance: newReceiverBalance },
+        });
+
+        // 6. Registrar histórico de débito do sender
+        await tx.balanceHistory.create({
+          data: {
+            userId: senderId,
+            transactionId,
+            previousBalance: senderBalance,
+            newBalance: newSenderBalance,
+            amount: -totalAmount, // Negativo para débito
+            type: 'DEBIT',
+            description: `Débito referente à transação ${transactionId || 'N/A'}`,
+          },
+        });
+
+        // 7. Registrar histórico de crédito do receiver
+        await tx.balanceHistory.create({
+          data: {
+            userId: receiverId,
+            transactionId,
+            previousBalance: receiverBalance,
+            newBalance: newReceiverBalance,
+            amount: netAmount, // Positivo para crédito
+            type: 'CREDIT',
+            description: `Crédito referente à transação ${transactionId || 'N/A'}`,
+          },
+        });
+
+        this.logger.log(
+          `✅ Transaction processed successfully: ${senderId} (${senderBalance} -> ${newSenderBalance}) | ${receiverId} (${receiverBalance} -> ${newReceiverBalance})`
+        );
+
+        return {
+          success: true,
+          message: 'Balance updated successfully',
+          senderPreviousBalance: senderBalance,
+          senderNewBalance: newSenderBalance,
+          receiverPreviousBalance: receiverBalance,
+          receiverNewBalance: newReceiverBalance,
+        };
+      });
+
+      // 8. Invalidar cache dos usuários E saldos após atualização
+      await Promise.all([
+        this.redis.del(this.getCacheKey(senderId)),
+        this.redis.del(this.getCacheKey(receiverId)),
+        this.redis.del(`user_transaction_balance:${senderId}`),
+        this.redis.del(`user_transaction_balance:${receiverId}`),
+      ]);
+      this.logger.log(`🗑️  Cache invalidated for users and balances: ${senderId}, ${receiverId}`);
+
+      // 9. Emitir eventos de notificação
+      this.notificationsClient.emit('notifications.balance.updated', {
+        userId: senderId,
+        type: 'DEBIT',
+        amount: totalAmount,
+        newBalance: result.senderNewBalance,
+        transactionId,
+        timestamp: new Date().toISOString(),
+      });
+
+      this.notificationsClient.emit('notifications.balance.updated', {
+        userId: receiverId,
+        type: 'CREDIT',
+        amount: netAmount,
+        newBalance: result.receiverNewBalance,
+        transactionId,
+        timestamp: new Date().toISOString(),
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error processing transaction balance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtém o saldo de transações de um usuário
+   * COM CACHE
+   */
+  async getUserTransactionBalance(userId: string) {
+    const cacheKey = `user_transaction_balance:${userId}`;
+
+    // 1. Tentar buscar no cache
+    const cachedBalance = await this.redis.get(cacheKey);
+    if (cachedBalance) {
+      this.logger.log(`✅ Cache HIT for transaction balance of user: ${userId}`);
+      return cachedBalance;
+    }
+
+    this.logger.log(`❌ Cache MISS for transaction balance of user: ${userId} - Fetching from database`);
+
+    // 2. Buscar no banco de dados
+    const bankingDetails = await this.prisma.bankingDetails.findUnique({
+      where: { userId },
+    });
+
+    if (!bankingDetails) {
+      throw new NotFoundException(`Banking details not found for user ${userId}`);
+    }
+
+    const balance = { balance: Number(bankingDetails.balance) };
+
+    // 3. Armazenar no cache
+    await this.redis.set(cacheKey, balance, this.CACHE_TTL);
+
+    return balance;
   }
 }

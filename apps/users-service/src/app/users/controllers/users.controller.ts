@@ -5,6 +5,7 @@ import {
   GetUserByIdDto,
   UpdateUserDto,
   UpdateProfilePictureDto,
+  ProcessTransactionBalanceDto,
 } from '../dto';
 
 @Controller()
@@ -70,6 +71,55 @@ export class UsersController {
         `Error uploading profile picture for user ${data.userId}:`,
         error
       );
+      throw error;
+    }
+  }
+
+  /**
+   * Message Pattern: process_transaction_balance
+   * Processa débito/crédito de saldo em uma transação
+   * CRÍTICO: Usado pelo transactions-service para atualizar saldos
+   */
+  @MessagePattern({ cmd: 'process_transaction_balance' })
+  async processTransactionBalance(
+    @Payload() data: ProcessTransactionBalanceDto & { transactionId?: string }
+  ) {
+    this.logger.log(
+      `🔄 Received process_transaction_balance message: ${data.senderId} -> ${data.receiverId} (${data.totalAmount})`
+    );
+    
+    try {
+      const result = await this.usersService.processTransactionBalance(data);
+      
+      if (result.success) {
+        this.logger.log(`✅ Balance processed successfully for transaction ${data.transactionId || 'N/A'}`);
+      } else {
+        this.logger.warn(`⚠️  Balance processing failed: ${result.message}`);
+      }
+      
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `❌ Error processing transaction balance:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Obtém o saldo de transações de um usuário
+   */
+  @MessagePattern({ cmd: 'get_user_transaction_balance' })
+  async getUserTransactionBalance(@Payload() data: { userId: string }) {
+    this.logger.log(`Received get_user_transaction_balance message for userId: ${data.userId}`);
+
+    try {
+      const balance = await this.usersService.getUserTransactionBalance(data.userId);
+      this.logger.log(`Successfully retrieved transaction balance for user: ${data.userId}`);
+      return balance;
+    } catch (error) {
+      this.logger.error(`Error getting transaction balance for user ${data.userId}:`, error);
       throw error;
     }
   }

@@ -9,6 +9,7 @@ async function main() {
   // Limpar dados existentes (apenas em desenvolvimento!)
   if (process.env.NODE_ENV !== 'production') {
     console.log('🗑️  Cleaning existing data...');
+    await prisma.balanceHistory.deleteMany();
     await prisma.bankingDetails.deleteMany();
     await prisma.user.deleteMany();
   }
@@ -25,6 +26,7 @@ async function main() {
         create: {
           agency: '0001',
           accountNumber: '12345-6',
+          balance: 10000.00, // R$ 10.000,00 saldo inicial
         },
       },
     },
@@ -38,6 +40,7 @@ async function main() {
         create: {
           agency: '0001',
           accountNumber: '67890-1',
+          balance: 5000.00, // R$ 5.000,00 saldo inicial
         },
       },
     },
@@ -51,6 +54,7 @@ async function main() {
         create: {
           agency: '0002',
           accountNumber: '11111-2',
+          balance: 15000.00, // R$ 15.000,00 saldo inicial
         },
       },
     },
@@ -64,6 +68,7 @@ async function main() {
         create: {
           agency: '0003',
           accountNumber: '22222-3',
+          balance: 7500.00, // R$ 7.500,00 saldo inicial
         },
       },
     },
@@ -76,6 +81,7 @@ async function main() {
         create: {
           agency: '0002',
           accountNumber: '33333-4',
+          balance: 20000.00, // R$ 20.000,00 saldo inicial
         },
       },
     },
@@ -86,7 +92,22 @@ async function main() {
       data: userData,
       include: { bankingDetails: true },
     });
-    console.log(`✅ Created user: ${user.email} (Agency: ${user.bankingDetails?.agency}, Account: ${user.bankingDetails?.accountNumber})`);
+    
+    // Criar histórico de saldo inicial
+    if (user.bankingDetails) {
+      await prisma.balanceHistory.create({
+        data: {
+          userId: user.id,
+          previousBalance: 0,
+          newBalance: user.bankingDetails.balance,
+          amount: user.bankingDetails.balance,
+          type: 'INITIAL',
+          description: 'Saldo inicial da conta',
+        },
+      });
+    }
+    
+    console.log(`✅ Created user: ${user.email} (Agency: ${user.bankingDetails?.agency}, Account: ${user.bankingDetails?.accountNumber}, Balance: R$ ${user.bankingDetails?.balance})`);
   }
 
   console.log('✨ Seeding completed successfully!');
