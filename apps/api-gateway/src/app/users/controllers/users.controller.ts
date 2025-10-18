@@ -62,6 +62,28 @@ export class UsersController {
     }
   }
 
+  @Get('/:email')
+  async getUserByEmail(
+    @Param('email') email: string,
+    @CurrentUser() user: CurrentUserData
+  ): Promise<UserResponseDto> {
+    this.logger.log(`Getting user details for email: ${email}, authenticated user: ${user.userId}`);
+
+    try {
+      const userDetails = await this.usersService.getUserByEmail(email);
+      return userDetails;
+    } catch (error) {
+      this.logger.error(
+        `Error getting user with email ${email}: ${error.message}`,
+        error.stack
+      );
+      throw new HttpException(
+        error.message || 'Failed to get user details',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   /**
    * PATCH /api/users/:userId
    * Atualização parcial de dados do cliente

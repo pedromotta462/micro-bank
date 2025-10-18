@@ -35,6 +35,27 @@ export class UsersService {
     }
   }
 
+  async getUserByEmail(email: string): Promise<UserResponseDto> {
+    this.logger.log(`Sending get_user_by_email message for email: ${email}`);
+    
+    try {
+      const response = await firstValueFrom(
+        this.usersClient
+          .send({ cmd: 'get_user_by_email' }, { email })
+          .pipe(timeout(5000))
+      );
+
+      this.logger.log(`Received user data for email: ${email}`);
+      return response;
+    } catch (error) {
+      this.logger.error(
+        `Error communicating with users-service for email ${email}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
   /**
    * Atualiza dados parciais de um usuário
    */
