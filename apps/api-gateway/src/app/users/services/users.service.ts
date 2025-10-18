@@ -102,4 +102,28 @@ export class UsersService {
       throw error;
     }
   }
+
+  /**
+   * Obtém o saldo de transações de um usuário
+   */
+  async getUserTransactionBalance(userId: string): Promise<{ balance: number }> {
+    this.logger.log(`Sending get_user_transaction_balance message for userId: ${userId}`);
+
+    try {
+      const response = await firstValueFrom(
+        this.usersClient
+          .send({ cmd: 'get_user_transaction_balance' }, { userId })
+          .pipe(timeout(5000))
+      );
+
+      this.logger.log(`Received transaction balance for userId: ${userId}`);
+      return response;
+    } catch (error) {
+      this.logger.error(
+        `Error communicating with users-service for userId ${userId}:`,
+        error
+      );
+      throw error;
+    }
+  }
 }

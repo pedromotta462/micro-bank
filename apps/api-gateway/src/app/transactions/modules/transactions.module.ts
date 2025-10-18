@@ -7,26 +7,13 @@ import { TransactionsService } from '../services/transactions.service';
   imports: [
     ClientsModule.register([
       {
-        name: 'USERS_SERVICE_CLIENT',
+        name: 'TRANSACTIONS_SERVICE_CLIENT',
         transport: Transport.RMQ,
         options: {
           urls: [
             process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672',
           ],
-          queue: 'users_queue',
-          queueOptions: {
-            durable: true,
-          },
-        },
-      },
-      {
-        name: 'NOTIFICATIONS_SERVICE_CLIENT',
-        transport: Transport.RMQ,
-        options: {
-          urls: [
-            process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672',
-          ],
-          queue: 'notifications_queue',
+          queue: 'transactions_queue',
           queueOptions: {
             durable: true,
           },
@@ -36,5 +23,6 @@ import { TransactionsService } from '../services/transactions.service';
   ],
   controllers: [TransactionsController],
   providers: [TransactionsService],
+  exports: [TransactionsService],
 })
 export class TransactionsModule {}
