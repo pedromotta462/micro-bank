@@ -149,6 +149,28 @@ yarn build:notifications
 nx build notifications-service
 ```
 
+### Docker
+
+```bash
+# Build da imagem
+docker build -f apps/notifications-service/Dockerfile -t micro-bank-notifications-service .
+
+# Executar container
+docker run -d \
+  --name notifications-service \
+  -p 3003:3003 \
+  -e RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672 \
+  -e RABBITMQ_QUEUE=notifications_queue \
+  --network micro-bank-network \
+  micro-bank-notifications-service
+
+# Com Docker Compose (recomendado)
+docker-compose up -d notifications-service
+
+# Ver logs
+docker-compose logs -f notifications-service
+```
+
 ### Testes
 
 ```bash

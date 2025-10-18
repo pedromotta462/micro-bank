@@ -9,6 +9,7 @@ import {
   Logger,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from '../services/users.service';
@@ -20,8 +21,15 @@ import {
   GetUserByIdSchema,
 } from '../dto';
 import { ZodValidationPipe, FileValidationPipe } from '../../common/pipes';
+import { JwtAuthGuard, OwnershipGuard } from '../../auth/guards';
+import { CurrentUser, CurrentUserData } from '../../auth/decorators';
 
+/**
+ * Controller responsável pelos endpoints de usuários no API Gateway
+ * PROTEGIDO: Requer autenticação JWT + ownership
+ */
 @Controller('/users')
+@UseGuards(JwtAuthGuard, OwnershipGuard)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
 
@@ -30,16 +38,18 @@ export class UsersController {
   /**
    * GET /api/users/:userId
    * Detalhes do cliente
+   * PROTEGIDO: Requer autenticação JWT + ownership (só pode ver próprios dados)
    */
   @Get(':userId')
   async getUserById(
-    @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams
+    @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
+    @CurrentUser() user: CurrentUserData
   ): Promise<UserResponseDto> {
-    this.logger.log(`Getting user details for userId: ${params.userId}`);
+    this.logger.log(`Getting user details for userId: ${params.userId}, authenticated user: ${user.userId}`);
 
     try {
-      const user = await this.usersService.getUserById(params.userId);
-      return user;
+      const userDetails = await this.usersService.getUserById(params.userId);
+      return userDetails;
     } catch (error) {
       this.logger.error(
         `Error getting user ${params.userId}: ${error.message}`,
@@ -55,19 +65,21 @@ export class UsersController {
   /**
    * PATCH /api/users/:userId
    * Atualização parcial de dados do cliente
+   * PROTEGIDO: Requer autenticação JWT + ownership (só pode atualizar próprios dados)
    */
   @Patch(':userId')
   async updateUser(
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
-    @Body(new ZodValidationPipe(UpdateUserSchema)) updateUserDto: UpdateUserDto
+    @Body(new ZodValidationPipe(UpdateUserSchema)) updateUserDto: UpdateUserDto,
+    @CurrentUser() user: CurrentUserData
   ): Promise<{ message: string; user: UserResponseDto }> {
-    this.logger.log(`Updating user ${params.userId} with data:`, updateUserDto);
+    this.logger.log(`Updating user ${params.userId} with data, authenticated user: ${user.userId}`, updateUserDto);
 
     try {
-      const user = await this.usersService.updateUser(params.userId, updateUserDto);
+      const updatedUser = await this.usersService.updateUser(params.userId, updateUserDto);
       return {
         message: 'User updated successfully',
-        user,
+        user: updatedUser,
       };
     } catch (error) {
       this.logger.error(
@@ -86,15 +98,17 @@ export class UsersController {
    * Upload e atualização da foto de perfil
    * Content-Type: multipart/form-data
    * Campo: file (jpg, jpeg, png, webp, máx 5MB)
+   * PROTEGIDO: Requer autenticação JWT + ownership
    */
   @Patch(':userId/profile-picture')
   @UseInterceptors(FileInterceptor('file'))
   async updateProfilePicture(
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
-    @UploadedFile(new FileValidationPipe()) file: any
+    @UploadedFile(new FileValidationPipe()) file: any,
+    @CurrentUser() user: CurrentUserData
   ): Promise<{ message: string; profilePicture: string }> {
     this.logger.log(
-      `Uploading profile picture for user ${params.userId}, file: ${file.originalname}`
+      `Uploading profile picture for user ${params.userId}, file: ${file.originalname}, authenticated user: ${user.userId}`
     );
 
     try {
@@ -120,13 +134,15 @@ export class UsersController {
 
   /**
    * GET /api/users/:userId/transaction-balance
-   * Get user transaction balance
+   * Consultar saldo da conta bancária do usuário
+   * PROTEGIDO: Requer autenticação JWT + ownership
    */
   @Get(':userId/transaction-balance')
   async getUserTransactionBalance(
-    @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams
+    @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
+    @CurrentUser() user: CurrentUserData
   ): Promise<{ balance: number }> {
-    this.logger.log(`Getting transaction balance for userId: ${params.userId}`);
+    this.logger.log(`Getting transaction balance for userId: ${params.userId}, authenticated user: ${user.userId}`);
 
     try {
       const balance = await this.usersService.getUserTransactionBalance(params.userId);

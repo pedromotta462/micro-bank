@@ -110,6 +110,10 @@ export class UsersController {
   /**
    * Obtém o saldo de transações de um usuário
    */
+  /**
+   * Message Pattern: get_user_transaction_balance
+   * Retorna o saldo bancário do usuário com cache
+   */
   @MessagePattern({ cmd: 'get_user_transaction_balance' })
   async getUserTransactionBalance(@Payload() data: { userId: string }) {
     this.logger.log(`Received get_user_transaction_balance message for userId: ${data.userId}`);
@@ -120,6 +124,42 @@ export class UsersController {
       return balance;
     } catch (error) {
       this.logger.error(`Error getting transaction balance for user ${data.userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Message Pattern: get_user_by_email
+   * Busca um usuário por email (usado para autenticação)
+   */
+  @MessagePattern({ cmd: 'get_user_by_email' })
+  async getUserByEmail(@Payload() data: { email: string }) {
+    this.logger.log(`Received get_user_by_email message for email: ${data.email}`);
+
+    try {
+      const user = await this.usersService.getUserByEmail(data.email);
+      this.logger.log(`Successfully retrieved user by email: ${data.email}`);
+      return user;
+    } catch (error) {
+      this.logger.error(`Error getting user by email ${data.email}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Message Pattern: create_user
+   * Cria um novo usuário (usado para registro)
+   */
+  @MessagePattern({ cmd: 'create_user' })
+  async createUser(@Payload() data: any) {
+    this.logger.log(`Received create_user message for email: ${data.email}`);
+
+    try {
+      const user = await this.usersService.createUser(data);
+      this.logger.log(`Successfully created user: ${user.id}`);
+      return user;
+    } catch (error) {
+      this.logger.error(`Error creating user:`, error);
       throw error;
     }
   }

@@ -370,7 +370,7 @@ export class UsersService {
   }
 
   /**
-   * Obtém o saldo de transações de um usuário
+   * Obtém o saldo de transações de um usuário (saldo bancário)
    * COM CACHE
    */
   async getUserTransactionBalance(userId: string) {
@@ -400,5 +400,69 @@ export class UsersService {
     await this.redis.set(cacheKey, balance, this.CACHE_TTL);
 
     return balance;
+  }
+
+  /**
+   * Busca um usuário por email
+   * Usado para autenticação - RETORNA A SENHA
+   */
+  async getUserByEmail(email: string) {
+    this.logger.log(`Fetching user by email: ${email}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        bankingDetails: true,
+      },
+    });
+
+    if (!user) {
+      return null; // Não lança erro para não dar dicas se o email existe
+    }
+
+    return user; // Retorna com senha para validação
+  }
+
+  /**
+   * Cria um novo usuário
+   * Usado para registro
+   */
+  async createUser(data: any) {
+    this.logger.log(`Creating new user: ${data.email}`);
+
+    // Criar usuário e dados bancários em uma transação
+    const user = await this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: data.password, // Já vem hasheado do auth.service
+        address: data.address,
+        profilePicture: data.profilePicture,
+        bankingDetails: data.bankingDetails
+          ? {
+              create: {
+                agency: data.bankingDetails.agency,
+                accountNumber: data.bankingDetails.accountNumber,
+                balance: 0, // Saldo inicial zero
+              },
+            }
+          : undefined,
+      },
+      include: {
+        bankingDetails: true,
+      },
+    });
+
+    // Remove a senha antes de retornar
+    const { password, ...userWithoutPassword } = user;
+
+    // Emitir evento de novo usuário para notifications
+    this.notificationsClient.emit('notifications.user.created', {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    return userWithoutPassword;
   }
 }
