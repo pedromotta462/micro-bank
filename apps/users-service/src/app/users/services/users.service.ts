@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../../common/services/prisma.service';
 import { S3Service } from '../../common/services/s3.service';
 import { RedisService } from '../../common/services/redis.service';
@@ -12,15 +13,16 @@ import {
 
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
   private readonly CACHE_PREFIX = 'user:';
   private readonly CACHE_TTL = parseInt(process.env.REDIS_USER_TTL || '3600', 10); // 1 hora
 
   constructor(
+    @InjectPinoLogger(UsersService.name)
+    private readonly logger: PinoLogger,
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
     private readonly redis: RedisService,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     @Inject('TRANSACTIONS_SERVICE_CLIENT') private readonly transactionsClient: ClientProxy,
     @Inject('NOTIFICATIONS_SERVICE_CLIENT') private readonly notificationsClient: ClientProxy
   ) {}
@@ -42,11 +44,11 @@ export class UsersService {
     // 1. Tentar buscar no cache
     const cachedUser = await this.redis.get(cacheKey);
     if (cachedUser) {
-      this.logger.log(`✅ Cache HIT for user: ${data.userId}`);
+      this.logger.info(`✅ Cache HIT for user: ${data.userId}`);
       return cachedUser;
     }
 
-    this.logger.log(`❌ Cache MISS for user: ${data.userId} - Fetching from database`);
+    this.logger.info(`❌ Cache MISS for user: ${data.userId} - Fetching from database`);
 
     // 2. Buscar no banco de dados
     const user = await this.prisma.user.findUnique({
@@ -74,7 +76,7 @@ export class UsersService {
    * INVALIDA CACHE
    */
   async updateUser(data: UpdateUserDto) {
-    this.logger.log(`Updating user: ${data.userId}`);
+    this.logger.info(`Updating user: ${data.userId}`);
 
     // Verificar se o usuário existe
     const existingUser = await this.prisma.user.findUnique({
@@ -131,7 +133,7 @@ export class UsersService {
 
         // Invalidar cache após atualização
         await this.redis.del(this.getCacheKey(data.userId));
-        this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
+        this.logger.info(`🗑️  Cache invalidated for user: ${data.userId}`);
 
         // Publicar evento de notificação
         this.notificationsClient.emit(
@@ -141,7 +143,7 @@ export class UsersService {
             timestamp: new Date().toISOString(),
           }
         );
-        this.logger.log(`📨 Notification event emitted for user update: ${data.userId}`);
+        this.logger.info(`📨 Notification event emitted for user update: ${data.userId}`);
 
         return userWithoutPassword;
       }
@@ -153,7 +155,7 @@ export class UsersService {
 
     // Invalidar cache após atualização
     await this.redis.del(this.getCacheKey(data.userId));
-    this.logger.log(`🗑️  Cache invalidated for user: ${data.userId}`);
+    this.logger.info(`🗑️  Cache invalidated for user: ${data.userId}`);
 
     // Publicar evento de notificação
     this.notificationsClient.emit(
@@ -163,7 +165,7 @@ export class UsersService {
         timestamp: new Date().toISOString(),
       }
     );
-    this.logger.log(`📨 Notification event emitted for user update: ${data.userId}`);
+    this.logger.info(`📨 Notification event emitted for user update: ${data.userId}`);
 
     return userWithoutPassword;
   }
@@ -175,7 +177,7 @@ export class UsersService {
   async uploadProfilePicture(data: UpdateProfilePictureDto) {
     const { userId, file } = data;
 
-    this.logger.log(`Uploading profile picture for user: ${userId} to S3`);
+    this.logger.info(`Uploading profile picture for user: ${userId} to S3`);
 
     // Verificar se o usuário existe
     const existingUser = await this.prisma.user.findUnique({
@@ -208,7 +210,7 @@ export class UsersService {
 
     // Invalidar cache após atualização
     await this.redis.del(this.getCacheKey(userId));
-    this.logger.log(`🗑️  Cache invalidated for user: ${userId}`);
+    this.logger.info(`🗑️  Cache invalidated for user: ${userId}`);
 
     return {
       profilePicture: s3Url,
@@ -220,10 +222,10 @@ export class UsersService {
    * IDEMPOTENTE - Usa transactionId para evitar processamento duplicado
    * TRANSACIONAL - Usa transaction do Prisma para garantir atomicidade
    */
-  async processTransactionBalance(data: ProcessTransactionBalanceDto & { transactionId?: string }) {
+  async processTransactionBalance(data: ProcessTransactionBalanceDto) {
     const { senderId, receiverId, totalAmount, netAmount, transactionId } = data;
 
-    this.logger.log(
+    this.logger.info(
       `Processing transaction balance: ${senderId} -> ${receiverId} (Total: ${totalAmount}, Net: ${netAmount})`
     );
 
@@ -246,9 +248,10 @@ export class UsersService {
     try {
       // Usar transação do Prisma para garantir atomicidade
       const result = await this.prisma.$transaction(async (tx) => {
-        // 1. Buscar dados bancários do sender
+        // 1. Buscar dados bancários e informações do sender
         const senderBanking = await tx.bankingDetails.findUnique({
           where: { userId: senderId },
+          include: { user: { select: { name: true, email: true } } },
         });
 
         if (!senderBanking) {
@@ -269,9 +272,10 @@ export class UsersService {
           };
         }
 
-        // 3. Buscar dados bancários do receiver
+        // 3. Buscar dados bancários e informações do receiver
         const receiverBanking = await tx.bankingDetails.findUnique({
           where: { userId: receiverId },
+          include: { user: { select: { name: true, email: true } } },
         });
 
         if (!receiverBanking) {
@@ -303,7 +307,7 @@ export class UsersService {
             newBalance: newSenderBalance,
             amount: -totalAmount, // Negativo para débito
             type: 'DEBIT',
-            description: `Débito referente à transação ${transactionId || 'N/A'}`,
+            description: `Transferência enviada para ${receiverBanking.user.name || receiverBanking.user.email}`,
           },
         });
 
@@ -316,11 +320,11 @@ export class UsersService {
             newBalance: newReceiverBalance,
             amount: netAmount, // Positivo para crédito
             type: 'CREDIT',
-            description: `Crédito referente à transação ${transactionId || 'N/A'}`,
+            description: `Transferência recebida de ${senderBanking.user.name || senderBanking.user.email}`,
           },
         });
 
-        this.logger.log(
+        this.logger.info(
           `✅ Transaction processed successfully: ${senderId} (${senderBalance} -> ${newSenderBalance}) | ${receiverId} (${receiverBalance} -> ${newReceiverBalance})`
         );
 
@@ -341,7 +345,7 @@ export class UsersService {
         this.redis.del(`user_transaction_balance:${senderId}`),
         this.redis.del(`user_transaction_balance:${receiverId}`),
       ]);
-      this.logger.log(`🗑️  Cache invalidated for users and balances: ${senderId}, ${receiverId}`);
+      this.logger.info(`🗑️  Cache invalidated for users and balances: ${senderId}, ${receiverId}`);
 
       // 9. Emitir eventos de notificação
       this.notificationsClient.emit('notifications.balance.updated', {
@@ -370,7 +374,7 @@ export class UsersService {
   }
 
   /**
-   * Obtém o saldo de transações de um usuário
+   * Obtém o saldo de transações de um usuário (saldo bancário)
    * COM CACHE
    */
   async getUserTransactionBalance(userId: string) {
@@ -379,11 +383,11 @@ export class UsersService {
     // 1. Tentar buscar no cache
     const cachedBalance = await this.redis.get(cacheKey);
     if (cachedBalance) {
-      this.logger.log(`✅ Cache HIT for transaction balance of user: ${userId}`);
+      this.logger.info(`✅ Cache HIT for transaction balance of user: ${userId}`);
       return cachedBalance;
     }
 
-    this.logger.log(`❌ Cache MISS for transaction balance of user: ${userId} - Fetching from database`);
+    this.logger.info(`❌ Cache MISS for transaction balance of user: ${userId} - Fetching from database`);
 
     // 2. Buscar no banco de dados
     const bankingDetails = await this.prisma.bankingDetails.findUnique({
@@ -400,5 +404,70 @@ export class UsersService {
     await this.redis.set(cacheKey, balance, this.CACHE_TTL);
 
     return balance;
+  }
+
+  /**
+   * Busca um usuário por email
+   * Usado para autenticação - RETORNA A SENHA
+   */
+  async getUserByEmail(email: string) {
+    this.logger.info(`Fetching user by email: ${email}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        bankingDetails: true,
+      },
+    });
+
+    if (!user) {
+      return null; // Não lança erro para não dar dicas se o email existe
+    }
+
+    return user; // Retorna com senha para validação
+  }
+
+  /**
+   * Cria um novo usuário
+   * Usado para registro
+   */
+  async createUser(data: any) {
+    this.logger.info(`Creating new user: ${data.email}`);
+
+    // Criar usuário e dados bancários em uma transação
+    const user = await this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: data.password, // Já vem hasheado do auth.service
+        address: data.address,
+        profilePicture: data.profilePicture,
+        bankingDetails: data.bankingDetails
+          ? {
+              create: {
+                agency: data.bankingDetails.agency,
+                accountNumber: data.bankingDetails.accountNumber,
+                balance: 0, // Saldo inicial zero
+              },
+            }
+          : undefined,
+      },
+      include: {
+        bankingDetails: true,
+      },
+    });
+
+    // Remove a senha antes de retornar
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+
+    // Emitir evento de novo usuário para notifications
+    this.notificationsClient.emit('notifications.user.created', {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    return userWithoutPassword;
   }
 }

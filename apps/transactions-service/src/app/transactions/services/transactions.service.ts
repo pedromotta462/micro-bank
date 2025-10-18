@@ -1,10 +1,10 @@
 import {
   Injectable,
-  Logger,
   BadRequestException,
   NotFoundException,
   Inject,
 } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { PrismaClient, TransactionStatus, TransactionType } from '../../../../generated/prisma';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
@@ -16,10 +16,11 @@ import {
 
 @Injectable()
 export class TransactionsService {
-  private readonly logger = new Logger(TransactionsService.name);
   private readonly prisma: PrismaClient;
 
   constructor(
+    @InjectPinoLogger(TransactionsService.name)
+    private readonly logger: PinoLogger,
     @Inject('USERS_SERVICE_CLIENT')
     private readonly usersClient: ClientProxy,
     @Inject('NOTIFICATIONS_SERVICE_CLIENT')
@@ -30,7 +31,7 @@ export class TransactionsService {
 
   async onModuleInit() {
     await this.prisma.$connect();
-    this.logger.log('✅ Connected to transactions database');
+    this.logger.info('✅ Connected to transactions database');
   }
 
   async onModuleDestroy() {
@@ -41,7 +42,7 @@ export class TransactionsService {
    * Cria uma nova transação
    */
   async createTransaction(data: CreateTransactionDto) {
-    this.logger.log(
+    this.logger.info(
       `Creating transaction from ${data.senderUserId} to ${data.receiverUserId}`
     );
 
@@ -86,7 +87,7 @@ export class TransactionsService {
         'Transação criada e aguardando processamento'
       );
 
-      this.logger.log(`Transaction ${transaction.id} created successfully`);
+      this.logger.info(`Transaction ${transaction.id} created successfully`);
 
       // 5. Processar transação de forma assíncrona
       this.processTransaction(transaction.id).catch((error) => {
@@ -107,7 +108,7 @@ export class TransactionsService {
    * Processa a transação (validação de saldo e atualização)
    */
   private async processTransaction(transactionId: string) {
-    this.logger.log(`Processing transaction ${transactionId}`);
+    this.logger.info(`Processing transaction ${transactionId}`);
 
     try {
       // Atualizar status para PROCESSING
@@ -134,6 +135,7 @@ export class TransactionsService {
 
       // Validar e atualizar saldo do remetente via users-service
       const balanceValidated = await this.validateAndUpdateBalance(
+        transaction.id,
         transaction.senderUserId,
         transaction.receiverUserId,
         Number(transaction.totalAmount),
@@ -166,7 +168,7 @@ export class TransactionsService {
       // Emitir evento para notifications-service
       this.emitNotificationEvent(completedTransaction, 'TRANSACTION_COMPLETED');
 
-      this.logger.log(`Transaction ${transactionId} completed successfully`);
+      this.logger.info(`Transaction ${transactionId} completed successfully`);
     } catch (error) {
       this.logger.error(`Error processing transaction ${transactionId}:`, error);
       await this.failTransaction(
@@ -235,7 +237,7 @@ export class TransactionsService {
         throw new BadRequestException('Destinatário não encontrado');
       }
 
-      this.logger.log(`Users validated: ${senderId} -> ${receiverId}`);
+      this.logger.info(`Users validated: ${senderId} -> ${receiverId}`);
     } catch (error) {
       this.logger.error('Error validating users:', error);
       throw new BadRequestException('Erro ao validar usuários');
@@ -246,6 +248,7 @@ export class TransactionsService {
    * Valida e atualiza saldo via users-service
    */
   private async validateAndUpdateBalance(
+    transactionId: string,
     senderId: string,
     receiverId: string,
     totalAmount: number,
@@ -257,6 +260,7 @@ export class TransactionsService {
           .send(
             { cmd: 'process_transaction_balance' },
             {
+              transactionId,
               senderId,
               receiverId,
               totalAmount,
@@ -382,7 +386,7 @@ export class TransactionsService {
         timestamp: new Date(),
       });
 
-      this.logger.log(
+      this.logger.info(
         `Notification event emitted for transaction ${transaction.id}: ${eventType}`
       );
     } catch (error) {

@@ -44,15 +44,25 @@ Sistema bancário moderno construído com arquitetura de microsserviços usando 
 
 ### API Gateway - Endpoints
 
-#### Users
+#### Authentication 🔐 **NOVO**
+- `POST /api/auth/register` - Registrar novo usuário (retorna JWT)
+- `POST /api/auth/login` - Login (retorna JWT)
+- `GET /api/auth/profile` - Perfil do usuário autenticado
+
+#### Users 🔒 **Protegido**
 - `GET /api/users/:userId` - Obter detalhes do usuário
 - `PATCH /api/users/:userId` - Atualizar usuário
 - `POST /api/users/:userId/profile-picture` - Upload de foto
+- `GET /api/users/:userId/balance` - Consultar saldo
 
-#### Transactions ✨ **NOVO**
+**Todos os endpoints requerem autenticação JWT e validam ownership**
+
+#### Transactions 🔒 **Protegido**
 - `POST /api/transactions` - Criar nova transação
 - `GET /api/transactions/:transactionId` - Detalhes da transação
 - `GET /api/transactions/user/:userId` - Listar transações do usuário
+
+**Todos os endpoints requerem autenticação JWT e validam ownership**
 
 ## 📋 Estrutura do Projeto
 
@@ -164,8 +174,9 @@ nx serve transactions-service
 ## 📚 Documentação
 
 ### Endpoints
+- [Authentication](apps/api-gateway/src/docs/AUTHENTICATION.md) 🔐 **NOVO**
 - [Users Endpoints](apps/api-gateway/src/docs/USERS_ENDPOINTS.md)
-- [Transactions Endpoints](apps/api-gateway/src/docs/TRANSACTIONS_ENDPOINTS.md) ✨ **NOVO**
+- [Transactions Endpoints](apps/api-gateway/src/docs/TRANSACTIONS_ENDPOINTS.md)
 - [Validation Strategy](apps/api-gateway/src/docs/VALIDATION.md)
 
 ### Arquitetura
@@ -263,6 +274,8 @@ Crie arquivos `.env` em cada serviço:
 ```env
 PORT=3000
 RABBITMQ_URL=amqp://guest:guest@localhost:5672
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=24h
 ```
 
 ### users-service/.env
@@ -300,9 +313,12 @@ npm run lint:transactions # transactions-service
 
 ## 🎯 Próximos Passos
 
-- [ ] Implementar Notifications Service
-- [ ] Adicionar autenticação JWT nos endpoints
-- [ ] Implementar rate limiting
+- [x] ~~Implementar Notifications Service~~ ✅ **CONCLUÍDO**
+- [x] ~~Adicionar autenticação JWT nos endpoints~~ ✅ **CONCLUÍDO**
+- [x] ~~Implementar ownership validation~~ ✅ **CONCLUÍDO**
+- [x] ~~Hash de senhas com Argon2~~ ✅ **CONCLUÍDO**
+- [ ] Implementar refresh tokens
+- [ ] Adicionar rate limiting
 - [ ] Adicionar circuit breaker
 - [ ] Implementar retry automático para transações
 - [ ] Adicionar cache de validação de usuários
@@ -310,6 +326,7 @@ npm run lint:transactions # transactions-service
 - [ ] Suporte a transações em lote
 - [ ] Agendamento de transações futuras
 - [ ] Cancelamento/estorno de transações
+- [ ] Implementar 2FA (Two-Factor Authentication)
 
 ## Links Úteis
 

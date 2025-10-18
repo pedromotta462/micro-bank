@@ -1,5 +1,6 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { TransactionsService } from '../services/transactions.service';
 import {
   CreateTransactionDto,
@@ -15,16 +16,18 @@ import {
  */
 @Controller()
 export class TransactionsController {
-  private readonly logger = new Logger(TransactionsController.name);
-
-  constructor(private readonly transactionsService: TransactionsService) {}
+  constructor(
+    @InjectPinoLogger(TransactionsController.name)
+    private readonly logger: PinoLogger,
+    private readonly transactionsService: TransactionsService
+  ) {}
 
   /**
    * Handler: Criar nova transação
    */
   @MessagePattern({ cmd: 'create_transaction' })
   async createTransaction(@Payload() data: unknown) {
-    this.logger.log('Received create_transaction command');
+    this.logger.info('Received create_transaction command');
 
     // Validação com Zod
     const validation = createTransactionDtoSchema.safeParse(data);
@@ -48,7 +51,7 @@ export class TransactionsController {
    */
   @MessagePattern({ cmd: 'get_transaction_by_id' })
   async getTransactionById(@Payload() data: unknown) {
-    this.logger.log('Received get_transaction_by_id command');
+    this.logger.info('Received get_transaction_by_id command');
 
     // Validação com Zod
     const validation = getTransactionByIdDtoSchema.safeParse(data);
@@ -72,7 +75,7 @@ export class TransactionsController {
    */
   @MessagePattern({ cmd: 'get_transactions_by_user' })
   async getTransactionsByUser(@Payload() data: unknown) {
-    this.logger.log('Received get_transactions_by_user command');
+    this.logger.info('Received get_transactions_by_user command');
 
     // Validação com Zod
     const validation = getTransactionsByUserDtoSchema.safeParse(data);

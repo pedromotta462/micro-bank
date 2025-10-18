@@ -1,13 +1,14 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 import { UpdateUserDto, UserResponseDto } from '../dto';
 
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
-
   constructor(
+    @InjectPinoLogger(UsersService.name)
+    private readonly logger: PinoLogger,
     @Inject('USERS_SERVICE_CLIENT') private readonly usersClient: ClientProxy
   ) {}
 
@@ -15,7 +16,7 @@ export class UsersService {
    * Obtém detalhes de um usuário pelo ID
    */
   async getUserById(userId: string): Promise<UserResponseDto> {
-    this.logger.log(`Sending get_user_by_id message for userId: ${userId}`);
+    this.logger.info(`Sending get_user_by_id message for userId: ${userId}`);
 
     try {
       const response = await firstValueFrom(
@@ -24,11 +25,32 @@ export class UsersService {
           .pipe(timeout(5000))
       );
 
-      this.logger.log(`Received user data for userId: ${userId}`);
+      this.logger.info(`Received user data for userId: ${userId}`);
       return response;
     } catch (error) {
       this.logger.error(
         `Error communicating with users-service for userId ${userId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  async getUserByEmail(email: string): Promise<UserResponseDto> {
+    this.logger.info(`Sending get_user_by_email message for email: ${email}`);
+    
+    try {
+      const response = await firstValueFrom(
+        this.usersClient
+          .send({ cmd: 'get_user_by_email' }, { email })
+          .pipe(timeout(5000))
+      );
+
+      this.logger.info(`Received user data for email: ${email}`);
+      return response;
+    } catch (error) {
+      this.logger.error(
+        `Error communicating with users-service for email ${email}:`,
         error
       );
       throw error;
@@ -42,7 +64,7 @@ export class UsersService {
     userId: string,
     updateUserDto: UpdateUserDto
   ): Promise<UserResponseDto> {
-    this.logger.log(`Sending update_user message for userId: ${userId}`);
+    this.logger.info(`Sending update_user message for userId: ${userId}`);
 
     try {
       const response = await firstValueFrom(
@@ -51,7 +73,7 @@ export class UsersService {
           .pipe(timeout(5000))
       );
 
-      this.logger.log(`User ${userId} updated successfully`);
+      this.logger.info(`User ${userId} updated successfully`);
       return response;
     } catch (error) {
       this.logger.error(
@@ -70,7 +92,7 @@ export class UsersService {
     userId: string,
     file: any
   ): Promise<{ profilePicture: string }> {
-    this.logger.log(
+    this.logger.info(
       `Sending upload_profile_picture message for userId: ${userId}`
     );
 
@@ -92,7 +114,7 @@ export class UsersService {
           .pipe(timeout(10000)) // 10s para upload
       );
 
-      this.logger.log(`Profile picture uploaded for user ${userId}`);
+      this.logger.info(`Profile picture uploaded for user ${userId}`);
       return response;
     } catch (error) {
       this.logger.error(
@@ -107,7 +129,7 @@ export class UsersService {
    * Obtém o saldo de transações de um usuário
    */
   async getUserTransactionBalance(userId: string): Promise<{ balance: number }> {
-    this.logger.log(`Sending get_user_transaction_balance message for userId: ${userId}`);
+    this.logger.info(`Sending get_user_transaction_balance message for userId: ${userId}`);
 
     try {
       const response = await firstValueFrom(
@@ -116,7 +138,7 @@ export class UsersService {
           .pipe(timeout(5000))
       );
 
-      this.logger.log(`Received transaction balance for userId: ${userId}`);
+      this.logger.info(`Received transaction balance for userId: ${userId}`);
       return response;
     } catch (error) {
       this.logger.error(

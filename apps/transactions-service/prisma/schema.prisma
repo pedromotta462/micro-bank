@@ -77,7 +77,7 @@ model TransactionEvent {
   
   // Context
   description   String?             @db.Text
-  performedBy   String?             @db.Uuid // userId que executou ação (se aplicável)
+  performedBy   String?             @db.VarChar(255) // userId ou 'SYSTEM'
   
   // Timestamp
   createdAt     DateTime            @default(now()) @db.Timestamptz(3)
