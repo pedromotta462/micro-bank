@@ -45,6 +45,9 @@ model BankingDetails {
   agency        String   @db.VarChar(10)
   accountNumber String   @db.VarChar(20)
   
+  // Balance (Saldo)
+  balance       Decimal  @default(0.00) @db.Decimal(15, 2) // Saldo da conta
+  
   // Timestamps
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
@@ -54,4 +57,44 @@ model BankingDetails {
 
   @@map("banking_details")
   @@index([userId])
+  @@index([balance]) // Índice para consultas de saldo
+}
+
+// ============================================
+// Transaction History Model (para auditoria de saldo)
+// ============================================
+model BalanceHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  transactionId   String?  @db.Uuid // ID da transação que causou a mudança
+  
+  // Balance Changes
+  previousBalance Decimal  @db.Decimal(15, 2)
+  newBalance      Decimal  @db.Decimal(15, 2)
+  amount          Decimal  @db.Decimal(15, 2) // Valor da mudança (+ ou -)
+  
+  // Type
+  type            BalanceOperationType
+  description     String?  @db.Text
+  
+  // Timestamps
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("balance_history")
+  @@index([userId])
+  @@index([transactionId])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum BalanceOperationType {
+  CREDIT        // Crédito (recebimento)
+  DEBIT         // Débito (envio)
+  ADJUSTMENT    // Ajuste manual
+  INITIAL       // Saldo inicial
+
+  @@map("balance_operation_type")
 }
