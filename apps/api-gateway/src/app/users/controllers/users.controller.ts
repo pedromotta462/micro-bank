@@ -10,7 +10,7 @@ import {
   UploadedFile,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from '../services/users.service';
