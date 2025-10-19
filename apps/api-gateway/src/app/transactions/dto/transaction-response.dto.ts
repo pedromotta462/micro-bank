@@ -11,7 +11,7 @@ export const transactionResponseSchema = z.object({
   fee: z.number(),
   totalAmount: z.number(),
   description: z.string(),
-  externalId: z.string().nullable().optional(),
+  idempotencyKey: z.string().nullable().optional(),
   type: z.enum(['TRANSFER', 'PIX', 'TED', 'DOC', 'PAYMENT', 'DEPOSIT', 'WITHDRAWAL']),
   status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED', 'REVERSED']),
   failureReason: z.string().nullable().optional(),
