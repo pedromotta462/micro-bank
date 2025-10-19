@@ -36,8 +36,8 @@ jobs:
       # Generate Prisma clients before build with native binary targets
       - name: Generate Prisma Clients
         run: |
-          yarn nx prisma:generate users-service -- --binary-targets native
-          yarn nx prisma:generate transactions-service -- --binary-targets native
+          yarn nx prisma:generate users-service
+          yarn nx prisma:generate transactions-service
 
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: yarn nx-cloud record -- echo Hello World
