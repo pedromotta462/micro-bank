@@ -10,7 +10,6 @@ import {
   UploadedFile,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from '../services/users.service';
@@ -29,8 +28,6 @@ import { CurrentUser, CurrentUserData } from '../../auth/decorators';
  * Controller responsável pelos endpoints de usuários no API Gateway
  * PROTEGIDO: Requer autenticação JWT + ownership
  */
-@ApiTags('users')
-@ApiBearerAuth('JWT-auth')
 @Controller('/users')
 @UseGuards(JwtAuthGuard, OwnershipGuard)
 export class UsersController {
@@ -46,15 +43,6 @@ export class UsersController {
    * PROTEGIDO: Requer autenticação JWT + ownership (só pode ver próprios dados)
    */
   @Get(':userId')
-  @ApiOperation({ 
-    summary: 'Get user by ID', 
-    description: 'Get user details. User can only access their own data.' 
-  })
-  @ApiParam({ name: 'userId', type: 'string', format: 'uuid', example: '19053dc1-4fc1-4ff7-b5cd-731494430daa' })
-  @ApiResponse({ status: 200, description: 'User details retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
-  @ApiResponse({ status: 403, description: 'Forbidden - User is not the owner' })
-  @ApiResponse({ status: 404, description: 'User not found' })
   async getUserById(
     @Param(new ZodValidationPipe(GetUserByIdSchema)) params: GetUserByIdParams,
     @CurrentUser() user: CurrentUserData
