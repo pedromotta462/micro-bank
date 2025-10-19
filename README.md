@@ -2,6 +2,23 @@
 
 Sistema bancário moderno construído com arquitetura de microsserviços usando NestJS, Nx Monorepo, RabbitMQ, PostgreSQL, Redis e AWS S3.
 
+## ✨ Features Destacadas
+
+### 📚 Documentação Swagger/OpenAPI
+Todos os serviços possuem documentação interativa Swagger:
+- **API Gateway**: http://localhost:3000/api/docs
+- **Users Service**: http://localhost:3002/api/docs  
+- **Transactions Service**: http://localhost:3001/api/docs
+
+### 🔄 Idempotência em Transações
+Sistema completo de idempotência para prevenir transações duplicadas:
+- Suporte via `idempotencyKey` (UUID)
+- Geração automática se não fornecido
+- Proteção contra retry de rede e clique duplo
+- Retorna transação existente ao invés de criar duplicata
+
+📖 **Documentação completa**: [SWAGGER.md](./SWAGGER.md) | [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md)
+
 ## 🚀 Tecnologias
 
 ### Backend & Framework
@@ -327,57 +344,87 @@ Ver documentação completa: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 🚀 Como Executar
 
+### ⚡ Início Rápido (Recomendado)
+
+```bash
+# 1. Subir infraestrutura (PostgreSQL, RabbitMQ, Redis)
+yarn run infra
+
+# 2. Instalar dependências
+yarn install
+
+# 3. Configurar banco de dados
+yarn run prisma:generate  # Gerar clientes Prisma
+yarn run prisma:migrate   # Aplicar migrations
+yarn run prisma:seed      # Dados iniciais (opcional)
+
+# 4. Iniciar TODOS os serviços com um comando
+./start-all-services.sh
+```
+
+Após ~15 segundos, acesse:
+- 📚 **Swagger API Gateway**: http://localhost:3000/api/docs
+- 📚 **Swagger Users**: http://localhost:3002/api/docs
+- 📚 **Swagger Transactions**: http://localhost:3001/api/docs
+
+### 📋 Passo a Passo Detalhado
+
 ### 1. Pré-requisitos
 ```bash
-node >= 18
-npm >= 9
+node >= 20
+yarn >= 1.22
 docker & docker-compose
 ```
 
 ### 2. Instalação
 ```bash
 # Instalar dependências
-npm install
+yarn install
 
-# Subir infraestrutura (PostgreSQL + RabbitMQ)
-npm run docker:up
+# Subir infraestrutura (PostgreSQL + RabbitMQ + Redis)
+yarn run infra
 ```
 
 ### 3. Configurar Banco de Dados
 ```bash
 # Gerar cliente Prisma
-npm run prisma:generate
+yarn run prisma:generate
 
 # Rodar migrations
-npm run prisma:migrate
+yarn run prisma:migrate
 
 # Seed (dados iniciais)
-npm run prisma:seed
+yarn run prisma:seed
 ```
 
 ### 4. Executar Serviços
 
-#### Desenvolvimento (todos os serviços juntos)
+#### 🎯 Opção 1: Script Automatizado (Recomendado)
 ```bash
-npm run start:all
+./start-all-services.sh
+```
+
+#### 🔧 Opção 2: Manual - Todos os serviços juntos
+```bash
+yarn run start:all
 # ou
 nx run-many --target=serve --projects=api-gateway,users-service,transactions-service --parallel=3
 ```
 
-#### Desenvolvimento (serviços individuais)
+#### 🛠️ Opção 3: Manual - Serviços individuais
 ```bash
-# API Gateway
-npm start
+# API Gateway (Porta 3000)
+yarn start
 # ou
 nx serve api-gateway
 
-# Users Service
-npm run start:users
+# Users Service (Porta 3002)
+yarn run start:users
 # ou
 nx serve users-service
 
-# Transactions Service
-npm run start:transactions
+# Transactions Service (Porta 3001)
+yarn run start:transactions
 # ou
 nx serve transactions-service
 ```
@@ -541,6 +588,26 @@ nx run users-service:prisma:studio
 nx run transactions-service:prisma:generate
 nx run transactions-service:prisma:migrate
 nx run transactions-service:prisma:studio
+
+### Scripts Úteis
+
+```bash
+# Iniciar todos os serviços
+./start-all-services.sh
+
+# Parar todos os serviços
+pkill -f "nx serve"
+
+# Ver logs em tempo real
+tail -f /tmp/api-gateway.log
+tail -f /tmp/users.log
+tail -f /tmp/transactions.log
+
+# Health checks
+curl http://localhost:3000/api/health
+curl http://localhost:3001/api/health
+curl http://localhost:3002/api/health
+```
 ```
 
 ## 🔐 Variáveis de Ambiente

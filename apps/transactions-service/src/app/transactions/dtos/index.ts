@@ -11,7 +11,7 @@ export const createTransactionDtoSchema = z.object({
   type: z
     .enum(['TRANSFER', 'PIX', 'TED', 'DOC', 'PAYMENT', 'DEPOSIT', 'WITHDRAWAL'])
     .default('TRANSFER'),
-  externalId: z.string().max(100).optional(),
+  idempotencyKey: z.string().uuid('Idempotency key must be a valid UUID').optional(),
   ipAddress: z.string().max(45).optional(),
   userAgent: z.string().optional(),
 });

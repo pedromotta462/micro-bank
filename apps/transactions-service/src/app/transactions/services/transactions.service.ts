@@ -4,8 +4,14 @@ import {
   NotFoundException,
   Inject,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { PrismaClient, TransactionStatus, TransactionType } from '../../../../generated/prisma';
+import { 
+  PrismaClient, 
+  TransactionStatus, 
+  TransactionType,
+  Transaction 
+} from '../../../../generated/prisma';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
@@ -41,27 +47,42 @@ export class TransactionsService {
   /**
    * Cria uma nova transação
    */
-  async createTransaction(data: CreateTransactionDto) {
-    this.logger.info(
-      `Creating transaction from ${data.senderUserId} to ${data.receiverUserId}`
-    );
-
-    // Validação: não permitir transferência para si mesmo
-    if (data.senderUserId === data.receiverUserId) {
-      throw new BadRequestException(
-        'Não é possível transferir para a mesma conta'
-      );
-    }
-
+  async createTransaction(data: CreateTransactionDto): Promise<Transaction> {
     try {
-      // 1. Validar existência dos usuários
+      this.logger.info(
+        `Creating transaction from ${data.senderUserId} to ${data.receiverUserId}`
+      );
+
+      // 1. Garantir que sempre tenha idempotencyKey (gerar se não vier)
+      const idempotencyKey = data.idempotencyKey || randomUUID();
+
+      // 2. Verificar idempotência - retornar transação existente se já foi criada
+      const existingTransaction = await this.prisma.transaction.findUnique({
+        where: { idempotencyKey },
+      });
+
+      if (existingTransaction) {
+        this.logger.info(
+          `Transaction already exists with idempotencyKey: ${idempotencyKey}, returning existing transaction: ${existingTransaction.id}`
+        );
+        return existingTransaction;
+      }
+
+      // 3. Validar que sender e receiver são diferentes
+      if (data.senderUserId === data.receiverUserId) {
+        throw new BadRequestException(
+          'Não é possível transferir para a mesma conta'
+        );
+      }
+
+      // 4. Validar usuários
       await this.validateUsers(data.senderUserId, data.receiverUserId);
 
-      // 2. Calcular taxa (exemplo: 1% para transferências, 0% para PIX)
+      // 5. Calcular taxa (exemplo: 1% para transferências, 0% para PIX)
       const fee = this.calculateFee(data.amount, data.type);
       const totalAmount = data.amount + fee;
 
-      // 3. Criar transação como PENDING
+      // 6. Criar transação como PENDING
       const transaction = await this.prisma.transaction.create({
         data: {
           senderUserId: data.senderUserId,
@@ -72,13 +93,13 @@ export class TransactionsService {
           description: data.description,
           type: data.type as TransactionType,
           status: TransactionStatus.PENDING,
-          externalId: data.externalId,
+          idempotencyKey,
           ipAddress: data.ipAddress,
           userAgent: data.userAgent,
         },
       });
 
-      // 4. Registrar evento de criação
+      // 7. Registrar evento de criação
       await this.createTransactionEvent(
         transaction.id,
         'CREATED',
@@ -89,7 +110,7 @@ export class TransactionsService {
 
       this.logger.info(`Transaction ${transaction.id} created successfully`);
 
-      // 5. Processar transação de forma assíncrona
+      // 8. Processar transação de forma assíncrona
       this.processTransaction(transaction.id).catch((error) => {
         this.logger.error(
           `Error processing transaction ${transaction.id}:`,

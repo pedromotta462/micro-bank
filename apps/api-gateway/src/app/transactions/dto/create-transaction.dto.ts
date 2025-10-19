@@ -30,9 +30,9 @@ export const createTransactionSchema = z.object({
     .default('TRANSFER')
     .optional(),
   
-  externalId: z
+  idempotencyKey: z
     .string()
-    .max(100, { message: 'O ID externo deve ter no máximo 100 caracteres' })
+    .uuid({ message: 'A chave de idempotência deve ser um UUID válido' })
     .optional(),
 });
 
