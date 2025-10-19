@@ -1,10 +1,9 @@
+/* eslint-disable */
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from '../users.service';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { S3Service } from '../../../common/services/s3.service';
 import { RedisService } from '../../../common/services/redis.service';
-import { PinoLogger } from 'nestjs-pino';
-import { ClientProxy } from '@nestjs/microservices';
 import {
   mockUser,
   mockBankingDetails,

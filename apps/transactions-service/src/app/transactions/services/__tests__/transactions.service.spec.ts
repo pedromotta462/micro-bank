@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionsService } from '../transactions.service';
-import { PinoLogger } from 'nestjs-pino';
 import {
   mockLogger,
   createMockPrismaClient,

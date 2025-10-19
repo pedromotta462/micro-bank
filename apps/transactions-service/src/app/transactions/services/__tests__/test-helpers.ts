@@ -1,10 +1,10 @@
+/* eslint-disable */
 /**
  * Configuração compartilhada para testes do TransactionsService
  * Este arquivo contém mocks e helpers reutilizáveis
- */
-
+*/
 // @ts-nocheck - Jest globals são reconhecidos em runtime durante os testes
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// eslint-disable @typescript-eslint/no-explicit-any */
 
 export const mockTransaction = {
   id: 'trans-123',

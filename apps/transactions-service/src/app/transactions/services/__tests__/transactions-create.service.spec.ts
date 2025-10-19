@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { TransactionsService } from '../transactions.service';
-import { PinoLogger } from 'nestjs-pino';
 import { of } from 'rxjs';
 import {
   mockTransaction,

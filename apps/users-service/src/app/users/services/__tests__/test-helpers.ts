@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Configuração compartilhada para testes do UsersService
  * Este arquivo contém mocks e helpers reutilizáveis

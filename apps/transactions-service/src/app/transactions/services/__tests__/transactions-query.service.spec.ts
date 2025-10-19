@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { TransactionsService } from '../transactions.service';
-import { PinoLogger } from 'nestjs-pino';
 import {
   mockTransaction,
   mockCompletedTransaction,
