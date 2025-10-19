@@ -35,7 +35,6 @@ import { Request } from 'express';
             url: req.url,
             query: req.query,
             params: req.params,
-            // Include body but it will be redacted by redact config
             body: req.body,
             headers: {
               host: req.headers.host,
@@ -58,8 +57,7 @@ import { Request } from 'express';
             'req.headers.cookie',
             'req.body.password',
             'req.body.confirmPassword',
-            'req.body.cpf', // Dado sensível
-            'req.body.token', // Tokens
+            'req.body.token',
           ],
           remove: true,
         },
