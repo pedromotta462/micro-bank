@@ -99,6 +99,7 @@ services:
       - RATE_LIMIT_TTL=${RATE_LIMIT_TTL:-60}
       - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:3001
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - USERS_SERVICE_URL=http://users-service:3002
     networks:
       - micro-bank-network
@@ -134,8 +135,9 @@ services:
       - DATABASE_NAME=transactions_db
       - DATABASE_USER=transactions_user
       - DATABASE_PASSWORD=transactions_pass
+      - DATABASE_URL=postgresql://transactions_user:transactions_pass@postgres-transactions:5432/transactions_db?schema=public
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-      - RABBITMQ_QUEUE=transactions
+      - RABBITMQ_QUEUE=transactions_queue
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     networks:
@@ -174,12 +176,21 @@ services:
       - DATABASE_NAME=users_db
       - DATABASE_USER=users_user
       - DATABASE_PASSWORD=users_pass
+      - DATABASE_URL=postgresql://users_user:users_pass@postgres-users:5432/users_db?schema=public
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - JWT_EXPIRES_IN=7d
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - RABBITMQ_QUEUE=users
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_TTL=3600
+      - REDIS_USER_TTL=3600
+      - AWS_REGION=${AWS_REGION:-sa-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-micro-bank-bucket}
     networks:
       - micro-bank-network
     depends_on:
@@ -202,19 +213,22 @@ services:
       context: .
       dockerfile: apps/notifications-service/Dockerfile
     container_name: micro-bank-notifications-service
+    restart: unless-stopped
     ports:
       - "3003:3003"
-    networks:
-      - micro-bank-network
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3003
+      - APP_NAME=notifications-service
+      - APP_VERSION=${APP_VERSION:-1.0.0}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - RABBITMQ_QUEUE=notifications_queue
+    networks:
+      - micro-bank-network
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "console.log('Health check')"]
       interval: 30s
